@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fe62755912372b42abf877b7f489509, type: 3}
+  m_Name: SKL_HPUp
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  _id: SKL_HPUp
+  _skillName: "\u4F53\u529B\u5F37\u5316"
+  _description: "\u6700\u5927HP\u304C20\u30A2\u30C3\u30D7"
+  _type: 0
+  _cost: 500
+  _value: 20
+  _prerequisite: {fileID: 0}

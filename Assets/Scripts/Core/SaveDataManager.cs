@@ -23,10 +23,7 @@ public sealed class SaveDataManager : MonoBehaviour
     {
         public int CurrentDay;
         public int Gold;
-        public int ShopLevel;
         public List<MaterialEntry> Materials;
-        public List<string> FurnitureIds;
-        public List<string> UnlockedSkillIds;
 
         /// <summary>素材 1 エントリ分。</summary>
         [System.Serializable]
@@ -70,10 +67,7 @@ public sealed class SaveDataManager : MonoBehaviour
         {
             CurrentDay = gm.CurrentDay,
             Gold       = gm.Gold,
-            ShopLevel  = gm.ShopLevel,
-            Materials  = new List<SaveData.MaterialEntry>(),
-            FurnitureIds    = new List<string>(),
-            UnlockedSkillIds = new List<string>()
+            Materials  = new List<SaveData.MaterialEntry>()
         };
 
         // 素材
@@ -84,22 +78,6 @@ public sealed class SaveDataManager : MonoBehaviour
                 Id     = kvp.Key,
                 Amount = kvp.Value
             });
-        }
-
-        // 家具
-        foreach (FurnitureData furniture in gm.Inventory.Furniture)
-        {
-            if (furniture != null)
-            {
-                saveData.FurnitureIds.Add(furniture.Id);
-            }
-        }
-
-        // スキル
-        SkillManager skillManager = FindFirstObjectByType<SkillManager>();
-        if (skillManager != null)
-        {
-            saveData.UnlockedSkillIds = skillManager.GetUnlockedSkillIds();
         }
 
         // JSON 書き出し
@@ -141,7 +119,6 @@ public sealed class SaveDataManager : MonoBehaviour
         // ── 基本パラメータ復元 ──
         gm.SetCurrentDay(saveData.CurrentDay);
         gm.SetGold(saveData.Gold);
-        gm.SetShopLevel(saveData.ShopLevel);
 
         // ── インベントリクリア ──
         gm.Inventory.ClearAll();
@@ -149,7 +126,6 @@ public sealed class SaveDataManager : MonoBehaviour
         // ── 素材復元 ──
         if (saveData.Materials != null && saveData.Materials.Count > 0)
         {
-            // Resources 内の全 MaterialData を ID で引けるようにする
             MaterialData[] allMaterials = Resources.LoadAll<MaterialData>("");
             var materialLookup = new Dictionary<string, MaterialData>(allMaterials.Length);
             foreach (MaterialData mat in allMaterials)
@@ -170,42 +146,6 @@ public sealed class SaveDataManager : MonoBehaviour
                 {
                     Debug.LogWarning($"[SaveDataManager] 素材 ID '{entry.Id}' に対応する MaterialData が見つかりません。スキップします。");
                 }
-            }
-        }
-
-        // ── 家具復元 ──
-        if (saveData.FurnitureIds != null && saveData.FurnitureIds.Count > 0)
-        {
-            FurnitureData[] allFurniture = Resources.LoadAll<FurnitureData>("");
-            var furnitureLookup = new Dictionary<string, FurnitureData>(allFurniture.Length);
-            foreach (FurnitureData furn in allFurniture)
-            {
-                if (furn != null && !string.IsNullOrEmpty(furn.Id))
-                {
-                    furnitureLookup[furn.Id] = furn;
-                }
-            }
-
-            foreach (string id in saveData.FurnitureIds)
-            {
-                if (furnitureLookup.TryGetValue(id, out FurnitureData furnData))
-                {
-                    gm.Inventory.AddFurniture(furnData);
-                }
-                else
-                {
-                    Debug.LogWarning($"[SaveDataManager] 家具 ID '{id}' に対応する FurnitureData が見つかりません。スキップします。");
-                }
-            }
-        }
-
-        // ── スキル復元 ──
-        if (saveData.UnlockedSkillIds != null && saveData.UnlockedSkillIds.Count > 0)
-        {
-            SkillManager skillManager = FindFirstObjectByType<SkillManager>();
-            if (skillManager != null)
-            {
-                skillManager.RestoreUnlockedSkills(saveData.UnlockedSkillIds);
             }
         }
 

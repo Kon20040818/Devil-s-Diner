@@ -23,7 +23,6 @@ public sealed class GameManager : MonoBehaviour
     // ──────────────────────────────────────────────
     private const string BOOT_SCENE    = "BootScene";
     private const string ACTION_SCENE  = "ActionScene";
-    private const string MANAGEMENT_SCENE = "ManagementScene";
     private const float  DEFAULT_FIXED_DELTA_TIME = 0.02f; // 50 Hz
     private const int    STARTING_GOLD = 500;
     private const int    STARTING_DAY  = 1;
@@ -32,19 +31,13 @@ public sealed class GameManager : MonoBehaviour
     // 列挙型
     // ──────────────────────────────────────────────
 
-    /// <summary>1日のゲームフェーズ。</summary>
+    /// <summary>ゲームフェーズ。</summary>
     public enum GamePhase
     {
-        /// <summary>朝 — 出撃準備（ActionScene ロード前）</summary>
+        /// <summary>出撃準備（ActionScene ロード前）</summary>
         Morning,
-        /// <summary>昼 — 狩猟アクション（ActionScene）</summary>
-        Noon,
-        /// <summary>夕方 — 調理・開店準備（ManagementScene ロード直後）</summary>
-        Evening,
-        /// <summary>夜 — 経営・鑑賞（ManagementScene）</summary>
-        Night,
-        /// <summary>深夜 — リザルト表示</summary>
-        Midnight
+        /// <summary>狩猟アクション（ActionScene）</summary>
+        Noon
     }
 
     // ──────────────────────────────────────────────
@@ -76,9 +69,6 @@ public sealed class GameManager : MonoBehaviour
     /// <summary>所持金。</summary>
     public int Gold { get; private set; } = STARTING_GOLD;
 
-    /// <summary>店舗レベル（1始まり）。</summary>
-    public int ShopLevel { get; private set; } = 1;
-
     /// <summary>現在ロード中のシーン名。</summary>
     public string CurrentSceneName { get; private set; } = BOOT_SCENE;
 
@@ -91,9 +81,6 @@ public sealed class GameManager : MonoBehaviour
 
     /// <summary>セーブデータ復元用。外部から所持金を設定する。</summary>
     public void SetGold(int gold) { Gold = gold; OnGoldChanged?.Invoke(Gold); }
-
-    /// <summary>セーブデータ復元用。外部からShopLevelを設定する。</summary>
-    public void SetShopLevel(int level) { ShopLevel = level; }
 
     // ──────────────────────────────────────────────
     // 内部状態
@@ -156,12 +143,6 @@ public sealed class GameManager : MonoBehaviour
             gameObject.AddComponent<AudioManager>();
         }
 
-        // SkillManager を追加
-        if (!TryGetComponent(out SkillManager _skillMgr))
-        {
-            gameObject.AddComponent<SkillManager>();
-        }
-
         // シーンロード完了コールバック登録
         SceneManager.sceneLoaded += HandleSceneLoaded;
     }
@@ -181,9 +162,6 @@ public sealed class GameManager : MonoBehaviour
     /// </summary>
     private void LateUpdate()
     {
-        // シーン遷移中やヒットストップ中は除外する。
-        // ヒットストップは JustInputAction が _isHitStopActive フラグで管理するため、
-        // ここでは「アクションシーン以外で timeScale != 1」だけを安全弁対象とする。
         if (!_isTransitioning
             && CurrentSceneName != ACTION_SCENE
             && !Mathf.Approximately(Time.timeScale, 1f))
@@ -199,54 +177,29 @@ public sealed class GameManager : MonoBehaviour
     // ──────────────────────────────────────────────
 
     /// <summary>
-    /// 次のフェーズへ進行する。Midnight → Morning の場合は日数も加算する。
-    /// 必要に応じてシーン遷移も自動実行する。
+    /// 次のフェーズへ進行する。
+    /// Morning → Noon で ActionScene へ遷移。
+    /// Noon → Morning で日数加算し自動セーブ。
     /// </summary>
     public void AdvancePhase()
     {
         if (_isTransitioning) return;
 
-        GamePhase nextPhase;
-
         switch (CurrentPhase)
         {
             case GamePhase.Morning:
-                nextPhase = GamePhase.Noon;
-                // Morning → Noon: ActionScene へ遷移
-                SetPhase(nextPhase);
+                SetPhase(GamePhase.Noon);
                 LoadSceneAsync(ACTION_SCENE);
                 break;
 
             case GamePhase.Noon:
-                nextPhase = GamePhase.Evening;
-                // Noon → Evening: ManagementScene へ遷移
-                SetPhase(nextPhase);
-                LoadSceneAsync(MANAGEMENT_SCENE);
-                break;
-
-            case GamePhase.Evening:
-                nextPhase = GamePhase.Night;
-                // Evening → Night: 同一シーン内遷移（ManagementScene）
-                SetPhase(nextPhase);
-                break;
-
-            case GamePhase.Night:
-                nextPhase = GamePhase.Midnight;
-                // Night → Midnight: 同一シーン内遷移（リザルト表示）
-                SetPhase(nextPhase);
-                break;
-
-            case GamePhase.Midnight:
-                nextPhase = GamePhase.Morning;
-                // Midnight → Morning: 日数加算し、ManagementScene のまま準備画面へ
                 AdvanceDay();
-                SetPhase(nextPhase);
+                SetPhase(GamePhase.Morning);
 
-                // Midnight → Morning 遷移時に自動セーブ
                 if (SaveData != null)
                 {
                     SaveData.Save();
-                    Debug.Log("[GameManager] フェーズ遷移 (Midnight → Morning) で自動セーブ実行。");
+                    Debug.Log("[GameManager] フェーズ遷移 (Noon → Morning) で自動セーブ実行。");
                 }
                 break;
 
@@ -280,16 +233,6 @@ public sealed class GameManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
-    // 公開 API — 店舗レベル
-    // ──────────────────────────────────────────────
-
-    /// <summary>店舗レベルを1上げる。</summary>
-    public void LevelUpShop()
-    {
-        ShopLevel++;
-    }
-
-    // ──────────────────────────────────────────────
     // 公開 API — timeScale 安全復帰
     // ──────────────────────────────────────────────
 
@@ -310,25 +253,17 @@ public sealed class GameManager : MonoBehaviour
         CurrentDay   = STARTING_DAY;
         CurrentPhase = GamePhase.Morning;
         Gold         = STARTING_GOLD;
-        ShopLevel    = 1;
         Inventory.ClearAll();
     }
 
     // ──────────────────────────────────────────────
-    // 公開 API — シーン遷移（タイトル画面等から使用）
+    // 公開 API — シーン遷移
     // ──────────────────────────────────────────────
 
     /// <summary>指定シーンへ非同期遷移する。</summary>
     public void TransitionToScene(string sceneName)
     {
         LoadSceneAsync(sceneName);
-    }
-
-    /// <summary>ManagementScene へ遷移し Morning フェーズを開始する。</summary>
-    public void StartMorningPhase()
-    {
-        SetPhase(GamePhase.Morning);
-        LoadSceneAsync(MANAGEMENT_SCENE);
     }
 
     // ──────────────────────────────────────────────
@@ -352,7 +287,6 @@ public sealed class GameManager : MonoBehaviour
         if (_isTransitioning) return;
         _isTransitioning = true;
 
-        // timeScale を安全な状態に復帰してからシーンロード
         ForceRestoreTimeScale();
 
         AsyncOperation op = SceneManager.LoadSceneAsync(sceneName);

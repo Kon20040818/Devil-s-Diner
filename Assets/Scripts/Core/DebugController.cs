@@ -5,12 +5,12 @@
 // NOTE: プロダクションビルドでは無効化またはストリップすること。
 // ============================================================
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// デバッグ用チートコントローラー。
 /// F1: ダミー素材を全種10個ずつ追加
 /// F2: 所持金 +1000G
-/// F3: プレイヤーHP全回復
 /// F4: 手動セーブ
 /// F5: 手動ロード
 /// </summary>
@@ -30,28 +30,26 @@ public sealed class DebugController : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1))
+        var kb = Keyboard.current;
+        if (kb == null) return;
+
+        if (kb.f1Key.wasPressedThisFrame)
         {
             AddDebugMaterials();
         }
 
-        if (Input.GetKeyDown(KeyCode.F2))
+        if (kb.f2Key.wasPressedThisFrame)
         {
             GameManager.Instance.AddGold(_goldAddAmount);
             Debug.Log($"[DebugController] 所持金 +{_goldAddAmount}G (現在: {GameManager.Instance.Gold}G)");
         }
 
-        if (Input.GetKeyDown(KeyCode.F3))
-        {
-            HealPlayer();
-        }
-
-        if (Input.GetKeyDown(KeyCode.F4))
+        if (kb.f4Key.wasPressedThisFrame)
         {
             ManualSave();
         }
 
-        if (Input.GetKeyDown(KeyCode.F5))
+        if (kb.f5Key.wasPressedThisFrame)
         {
             ManualLoad();
         }
@@ -65,7 +63,6 @@ public sealed class DebugController : MonoBehaviour
     {
         MaterialData[] materials = _debugMaterials;
 
-        // Inspector 未設定時は Resources からフォールバック読み込み
         if (materials == null || materials.Length == 0)
         {
             materials = Resources.LoadAll<MaterialData>("");
@@ -84,21 +81,6 @@ public sealed class DebugController : MonoBehaviour
         }
 
         Debug.Log($"[DebugController] デバッグ素材追加完了！ {materials.Length}種 x {_materialAddAmount}個");
-    }
-
-    private void HealPlayer()
-    {
-        PlayerHealth playerHealth = FindFirstObjectByType<PlayerHealth>();
-
-        if (playerHealth != null)
-        {
-            playerHealth.ResetHP();
-            Debug.Log("[DebugController] プレイヤーHP全回復！");
-        }
-        else
-        {
-            Debug.Log("[DebugController] PlayerHealth が見つかりません（ActionScene 外の可能性）");
-        }
     }
 
     private void ManualSave()

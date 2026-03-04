@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fe62755912372b42abf877b7f489509, type: 3}
+  m_Name: SKL_DodgeDistance
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  _id: SKL_DodgeDistance
+  _skillName: "\u56DE\u907F\u8DDD\u96E2\u30A2\u30C3\u30D7"
+  _description: "\u56DE\u907F\u8DDD\u96E2\u304C2\u30E6\u30CB\u30C3\u30C8\u5897\u52A0"
+  _type: 5
+  _cost: 800
+  _value: 2
+  _prerequisite: {fileID: 0}

@@ -1,0 +1,177 @@
+/* ============================================================
+   BattleRevolverUI.uss
+   Gunman Revolver-style rotating battle command menu.
+   Screen bottom-left, mechanical cylinder rotation.
+   ============================================================ */
+
+/* ── ルートコンテナ：画面左下固定 ── */
+.revolver-root {
+    position: absolute;
+    left: 40px;
+    bottom: 40px;
+    width: 260px;
+    height: 260px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── シリンダー軸（中心の装飾円） ── */
+.cylinder-axis {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background-color: rgb(60, 60, 60);
+    border-width: 2px;
+    border-color: rgb(120, 120, 120);
+    /* 最前面 */
+    translate: 0 0;
+}
+
+/* ── 回転シリンダー本体 ── */
+.cylinder {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    align-items: center;
+    justify-content: center;
+
+    /* 回転トランジション */
+    transition-property: rotate;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+/* ── 弾丸（メニューアイテム） ── */
+.bullet {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 35px;
+    background-color: rgb(45, 45, 55);
+    border-width: 2px;
+    border-color: rgb(100, 100, 110);
+    align-items: center;
+    justify-content: center;
+
+    /* スケール・色のトランジション */
+    transition-property: scale, border-color, background-color;
+    transition-duration: 0.25s, 0.2s, 0.2s;
+    transition-timing-function: ease-out, ease-in-out, ease-in-out;
+    scale: 1.0;
+}
+
+/* 弾丸アイコン（将来スプライト差替え用） */
+.bullet-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    background-color: rgb(160, 160, 170);
+    margin-bottom: 2px;
+}
+
+/* 弾丸ラベル */
+.bullet-label {
+    font-size: 11px;
+    color: rgb(200, 200, 210);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* ── 選択状態 (.selected) ── */
+.bullet.selected {
+    scale: 1.2;
+    background-color: rgb(70, 40, 10);
+    border-color: rgb(255, 190, 50);
+    border-width: 3px;
+}
+
+.bullet.selected .bullet-icon {
+    background-color: rgb(255, 200, 60);
+}
+
+.bullet.selected .bullet-label {
+    color: rgb(255, 220, 100);
+    font-size: 12px;
+}
+
+/* ── 無効状態 (.disabled) ── */
+.bullet.disabled {
+    opacity: 0.35;
+    scale: 0.9;
+}
+
+.bullet.disabled .bullet-icon {
+    background-color: rgb(80, 80, 80);
+}
+
+.bullet.disabled .bullet-label {
+    color: rgb(100, 100, 100);
+}
+
+/* ── 選択インジケーター（上部の三角マーカー） ── */
+.selector-indicator {
+    position: absolute;
+    top: -8px;
+    /* シンプルなダイヤ型マーカー */
+    width: 16px;
+    height: 16px;
+    rotate: 45deg;
+    background-color: rgb(255, 190, 50);
+    border-width: 1px;
+    border-color: rgb(200, 140, 20);
+}
+
+/* ── 情報パネル（下部） ── */
+.info-panel {
+    position: absolute;
+    bottom: -50px;
+    left: 0;
+    right: 0;
+    align-items: center;
+    padding: 4px 8px;
+}
+
+.character-name {
+    font-size: 14px;
+    color: rgb(220, 220, 230);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+}
+
+.cost-label {
+    font-size: 11px;
+    color: rgb(180, 180, 190);
+    -unity-text-align: middle-center;
+    margin-top: 2px;
+}
+
+/* ── ターゲット選択用弾丸 (.target-bullet) ── */
+.target-bullet .bullet-icon {
+    background-color: rgb(200, 60, 60);
+}
+
+.target-bullet .bullet-label {
+    color: rgb(255, 180, 180);
+}
+
+.target-bullet.selected {
+    background-color: rgb(80, 20, 20);
+    border-color: rgb(255, 80, 80);
+}
+
+.target-bullet.selected .bullet-icon {
+    background-color: rgb(255, 100, 100);
+}
+
+.target-bullet.selected .bullet-label {
+    color: rgb(255, 220, 220);
+}
+
+/* ── メニュー非表示 ── */
+.revolver-root.hidden {
+    display: none;
+}

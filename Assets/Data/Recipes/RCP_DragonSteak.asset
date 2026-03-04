@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a8f0364f9391324881c4fddea51655a, type: 3}
+  m_Name: RCP_DragonSteak
+  m_EditorClassIdentifier: Assembly-CSharp::RecipeData
+  _id: RCP_DragonSteak
+  _recipeName: "\u7ADC\u738B\u306E\u30B9\u30C6\u30FC\u30AD"
+  _icon: {fileID: 0}
+  _requiredMaterials:
+  - Material: {fileID: 11400000, guid: 71e528d0fb021a74e868209d1c2618f4, type: 2}
+    Amount: 3
+  _basePrice: 500
+  _perfectMultiplier: 1.5
+  _modelPrefab: {fileID: 0}

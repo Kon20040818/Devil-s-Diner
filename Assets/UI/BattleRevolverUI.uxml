@@ -1,0 +1,51 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         xsi="http://www.w3.org/2001/XMLSchema-instance"
+         engine="UnityEngine.UIElements"
+         noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd">
+
+    <Style src="BattleRevolverUI.uss" />
+
+    <!-- ルートコンテナ：画面左下に固定 -->
+    <ui:VisualElement name="revolver-root" class="revolver-root">
+
+        <!-- 中心のシリンダー軸（装飾） -->
+        <ui:VisualElement name="cylinder-axis" class="cylinder-axis" />
+
+        <!-- 回転するシリンダー本体 -->
+        <ui:VisualElement name="cylinder" class="cylinder">
+
+            <!-- 弾丸メニュー項目（C#で動的生成も可能） -->
+            <ui:VisualElement name="bullet-attack" class="bullet">
+                <ui:VisualElement class="bullet-icon" />
+                <ui:Label text="攻撃" class="bullet-label" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="bullet-skill" class="bullet">
+                <ui:VisualElement class="bullet-icon" />
+                <ui:Label text="スキル" class="bullet-label" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="bullet-ultimate" class="bullet">
+                <ui:VisualElement class="bullet-icon" />
+                <ui:Label text="必殺技" class="bullet-label" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="bullet-guard" class="bullet">
+                <ui:VisualElement class="bullet-icon" />
+                <ui:Label text="防御" class="bullet-label" />
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+
+        <!-- 選択インジケーター（上部に固定、現在の選択位置を指す） -->
+        <ui:VisualElement name="selector-indicator" class="selector-indicator" />
+
+        <!-- キャラ名・コスト表示 -->
+        <ui:VisualElement name="info-panel" class="info-panel">
+            <ui:Label name="character-name" text="---" class="character-name" />
+            <ui:Label name="cost-label" text="" class="cost-label" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+
+</ui:UXML>

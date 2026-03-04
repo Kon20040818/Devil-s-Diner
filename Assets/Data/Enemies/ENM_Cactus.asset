@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69183e315fa686a4b8b43be7f4d03bb6, type: 3}
+  m_Name: ENM_Cactus
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyData
+  _id: ENM_Cactus
+  _enemyName: "\u30B5\u30DC\u30C6\u30F3\u9B54\u4EBA"
+  _maxHP: 300
+  _baseAttack: 8
+  _dropItemNormal: {fileID: 0}
+  _dropItemJust: {fileID: 0}
+  _dropRateNormal: 0.8
+  _dropRateJust: 1

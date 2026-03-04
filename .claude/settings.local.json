@@ -1,7 +1,43 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Read(//c/Users/kirll/Devil''''s Diner/Assets/**)",
+      "Read(//c/Users/kirll/Devil''s Diner/Assets/**)",
+      "WebFetch(domain:interfaceingame.com)",
+      "WebFetch(domain:note.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:kamigame.jp)",
+      "WebFetch(domain:ys-game-news.com)",
+      "WebFetch(domain:honkai-star-rail.fandom.com)",
+      "WebFetch(domain:www.icy-veins.com)",
+      "WebFetch(domain:game8.co)",
+      "WebFetch(domain:techwiser.com)",
+      "WebFetch(domain:www.hoyolab.com)",
+      "WebFetch(domain:progameguides.com)",
+      "WebFetch(domain:www.iggm.com)",
+      "WebFetch(domain:www.dualshockers.com)",
+      "WebFetch(domain:ourcodeworld.com)",
+      "WebFetch(domain:www.playerauctions.com)",
+      "WebFetch(domain:www.thegamer.com)",
+      "WebFetch(domain:gamingonphone.com)",
+      "WebFetch(domain:www.mobygames.com)",
+      "WebFetch(domain:wotpack.ru)",
+      "WebFetch(domain:www.pcinvasion.com)",
+      "WebFetch(domain:honkai.gg)",
+      "WebFetch(domain:primagames.com)",
+      "WebFetch(domain:rpghq.org)",
+      "WebFetch(domain:afkgaming.com)",
+      "WebFetch(domain:hsr.keqingmains.com)",
+      "WebFetch(domain:www.prydwen.gg)",
+      "WebFetch(domain:landofgames.ru)",
+      "WebFetch(domain:gameui.matme.info)",
+      "WebFetch(domain:gamerch.com)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts",
+      "c:\\Users\\kirll\\Devil''''s Diner\\Assets\\Scripts",
+      "c:\\Users\\kirll\\Devil''s Diner\\Assets"
     ]
   }
 }

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fe62755912372b42abf877b7f489509, type: 3}
+  m_Name: SKL_DodgeInvincible
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  _id: SKL_DodgeInvincible
+  _skillName: "\u56DE\u907F\u7121\u6575\u5EF6\u9577"
+  _description: "\u56DE\u907F\u7121\u6575\u6BD4\u7387\u304C15%\u5897\u52A0\uFF08\u56DE\u907F\u8DDD\u96E2\u30A2\u30C3\u30D7\u304C\u524D\u63D0\uFF09"
+  _type: 6
+  _cost: 1200
+  _value: 15
+  _prerequisite: {fileID: 11400000, guid: 664fdbbdbf7008541833ac8ef54b4b08, type: 2}
