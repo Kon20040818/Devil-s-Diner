@@ -1,0 +1,591 @@
+/* ============================================================
+   BattleUI.uss — 骨組みのみ（座標と角度のプレースホルダー）
+
+   目的: UI Builderで translate / rotate を手動微調整できる
+   ベースコードを提供する。装飾は後で追加する。
+   ============================================================ */
+
+/* ── Root: 画面全体 ── */
+.battle-ui-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: visible;
+}
+
+.hidden { display: none; }
+
+/* ════════════════════════════════════════════
+   COMMAND MENU
+   左下に固定。この要素が扇の「中心点」になる。
+   ════════════════════════════════════════════ */
+.command-menu {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 700px;
+    height: 600px;
+    overflow: visible;
+}
+
+/* ── ウォーターマーク（巨大薄文字） ── */
+.cmd-watermark {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    font-size: 100px;
+    -unity-font-style: bold;
+    color: rgba(255, 0, 0, 0.06);
+    letter-spacing: -6px;
+    rotate: -8deg;
+}
+
+/* ── キャラ名 ── */
+.active-char-name-wrap {
+    position: absolute;
+    left: 20px;
+    top: 10px;
+}
+.active-char-name {
+    font-size: 32px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+}
+
+/* ── SP ── */
+.sp-gauge-wrap {
+    position: absolute;
+    left: 24px;
+    top: 50px;
+}
+.sp-gauge {
+    flex-direction: row;
+    align-items: center;
+}
+.sp-label {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(0, 200, 200);
+    margin-right: 8px;
+}
+.sp-pips {
+    flex-direction: row;
+}
+.sp-pip {
+    width: 10px;
+    height: 10px;
+    margin-right: 3px;
+    background-color: rgba(0, 200, 200, 0.15);
+    border-width: 1px;
+    border-color: rgba(0, 200, 200, 0.3);
+    rotate: 45deg;
+}
+.sp-pip-active {
+    background-color: rgb(0, 220, 220);
+    border-color: rgb(150, 255, 255);
+}
+.sp-value {
+    font-size: 13px;
+    color: rgba(0, 200, 200, 0.5);
+    margin-left: 6px;
+    -unity-font-style: bold;
+}
+
+/* ════════════════════════════════════════════
+   コマンドボタン群 — absolute コンテナ
+   この中に5つのボタンが absolute で浮く。
+   ════════════════════════════════════════════ */
+.command-buttons {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 700px;
+    height: 600px;
+    overflow: visible;
+}
+
+/* ═══════════════════════════════════════════════════════
+   各ボタン — position: absolute で Flexbox を完全に無視。
+   translate で位置、rotate で傾きを個別に指定。
+
+   【円弧イメージ】左下が中心点。
+
+        ╲ slot-0 (左上、急角度)
+         ╲
+          ╲ slot-1
+           ╲
+            ╲ slot-2 (中間)
+              ╲
+               slot-3
+                 ╲
+                  slot-4 (右下、ほぼ水平)
+
+   UI Builder で各 cmd-slot-N の translate/rotate を
+   ドラッグして微調整すれば完璧な弧になる。
+   ═══════════════════════════════════════════════════════ */
+
+.cmd-button {
+    position: absolute;
+    width: 280px;
+    height: 56px;
+    overflow: visible;
+}
+
+/* ── 座標 + 角度（ここを UI Builder で微調整する） ── */
+.cmd-slot-0 { translate:  30px 100px;  rotate: -18deg; }
+.cmd-slot-1 { translate:  70px 180px;  rotate: -12deg; }
+.cmd-slot-2 { translate: 130px 260px;  rotate:  -7deg; }
+.cmd-slot-3 { translate: 210px 330px;  rotate:  -3deg; }
+.cmd-slot-4 { translate: 290px 390px;  rotate:   0deg; }
+
+/* ── ビジュアルラッパー（ボタン内部） ── */
+.cmd-button-visual {
+    width: 280px;
+    height: 56px;
+    overflow: visible;
+}
+
+/* ── BG: 半透明の黒い四角 ── */
+.cmd-button-bg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 56px;
+    background-color: rgba(0, 0, 0, 0.75);
+    border-left-width: 5px;
+    border-left-color: rgb(200, 0, 0);
+}
+
+/* ── テキスト: 白文字 ── */
+.cmd-button-label {
+    position: absolute;
+    left: 16px;
+    top: 12px;
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+    letter-spacing: 2px;
+}
+
+/* サブテキスト（骨組みでは非表示でもよいが互換性のため残す） */
+.cmd-button-sub {
+    position: absolute;
+    left: 16px;
+    top: 38px;
+    font-size: 9px;
+    color: rgba(200, 0, 0, 0.3);
+    -unity-font-style: italic;
+}
+
+/* 装飾線（骨組みでは非表示） */
+.cmd-slash-accent { display: none; }
+.cmd-accent-line  { display: none; }
+
+/* ════════════════════════════════════════════
+   選択状態 — 白黒反転でわかりやすく
+   ════════════════════════════════════════════ */
+.cmd-button.is-active .cmd-button-bg {
+    background-color: rgb(255, 255, 255);
+    border-left-color: rgb(0, 0, 0);
+}
+.cmd-button.is-active .cmd-button-label {
+    color: rgb(0, 0, 0);
+}
+
+/* 使用不可 */
+.cmd-button.is-disabled { opacity: 0.2; }
+
+/* ── ヒント ── */
+.cmd-hint-wrap {
+    position: absolute;
+    left: 30px;
+    bottom: 8px;
+}
+.cmd-hint {
+    font-size: 11px;
+    color: rgba(180, 180, 180, 0.4);
+    letter-spacing: 2px;
+}
+
+/* ════════════════════════════════════════════
+   ターゲット選択（C#で動的生成される）
+   ════════════════════════════════════════════ */
+.target-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 700px;
+    height: 600px;
+    overflow: visible;
+}
+
+.target-entry {
+    position: absolute;
+    width: 260px;
+    height: 50px;
+    overflow: visible;
+}
+
+.target-entry-visual {
+    width: 260px;
+    height: 50px;
+}
+
+.target-entry-bg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 260px;
+    height: 50px;
+    background-color: rgba(0, 0, 0, 0.75);
+    border-left-width: 5px;
+    border-left-color: rgb(200, 0, 0);
+}
+
+.target-entry-name {
+    position: absolute;
+    left: 14px;
+    top: 8px;
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+}
+
+.target-entry-hp {
+    position: absolute;
+    right: 10px;
+    top: 14px;
+    font-size: 13px;
+    color: rgba(200, 0, 0, 0.5);
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+}
+
+.target-entry.is-active .target-entry-bg {
+    background-color: rgb(255, 255, 255);
+    border-left-color: rgb(0, 0, 0);
+}
+.target-entry.is-active .target-entry-name { color: rgb(0, 0, 0); }
+.target-entry.is-active .target-entry-hp   { color: rgba(0, 0, 0, 0.5); }
+
+/* ════════════════════════════════════════════
+   ACTION ORDER GAUGE — 右端縦並び
+   ════════════════════════════════════════════ */
+.action-order-gauge {
+    position: absolute;
+    right: 10px;
+    top: 20px;
+    bottom: 180px;
+    width: 110px;
+    align-items: center;
+    overflow: visible;
+}
+
+.aog-title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgba(230, 0, 18, 0.5);
+    letter-spacing: 8px;
+    margin-bottom: 10px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.9);
+}
+
+.aog-watermark {
+    position: absolute;
+    right: 0;
+    top: 40px;
+    width: 300px;
+    height: 130px;
+    font-size: 110px;
+    -unity-font-style: bold;
+    color: rgba(230, 0, 18, 0.025);
+    letter-spacing: -6px;
+    rotate: 90deg;
+    translate: 60px 180px;
+    overflow: visible;
+}
+
+.aog-track {
+    flex-grow: 1;
+    width: 110px;
+    align-items: center;
+    padding-top: 10px;
+    padding-bottom: 4px;
+    overflow: visible;
+}
+
+.aog-line {
+    position: absolute;
+    left: 53px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: rgba(230, 0, 18, 0.55);
+}
+
+.aog-entry {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 6px;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+
+    transition-property: translate, opacity, scale;
+    transition-duration: 0.1s;
+    transition-timing-function: ease-out;
+}
+
+.aog-entry-frame {
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(5, 5, 5);
+    border-width: 2px;
+    border-color: rgba(80, 80, 100, 0.5);
+    border-radius: 0;
+    rotate: 45deg;
+}
+
+.aog-entry-initial {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(130, 130, 150);
+    -unity-text-align: middle-center;
+    rotate: -45deg;
+    width: 28px;
+    height: 28px;
+}
+
+.aog-entry-player .aog-entry-frame {
+    border-color: rgb(0, 255, 255);
+    background-color: rgba(0, 6, 10, 0.97);
+}
+.aog-entry-player .aog-entry-initial { color: rgb(0, 255, 255); }
+
+.aog-entry-enemy .aog-entry-frame {
+    border-color: rgb(230, 0, 18);
+    background-color: rgba(10, 0, 0, 0.97);
+}
+.aog-entry-enemy .aog-entry-initial { color: rgb(255, 60, 60); }
+
+.aog-active {
+    scale: 2.5;
+    margin-top: 14px;
+    margin-bottom: 30px;
+}
+
+.aog-glow-outer {
+    position: absolute;
+    left: -5px;
+    top: -5px;
+    width: 60px;
+    height: 60px;
+    background-color: transparent;
+    border-width: 1px;
+    border-color: rgba(255, 200, 50, 0.12);
+    border-radius: 0;
+    rotate: 45deg;
+}
+.aog-glow {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 46px;
+    height: 46px;
+    background-color: transparent;
+    border-width: 2px;
+    border-color: rgba(255, 200, 50, 0.3);
+    border-radius: 0;
+    rotate: 45deg;
+}
+
+.aog-active .aog-entry-frame {
+    width: 34px;
+    height: 34px;
+    border-color: rgb(255, 200, 50);
+    border-width: 3px;
+    background-color: rgba(25, 18, 0, 0.97);
+}
+.aog-active .aog-entry-initial {
+    font-size: 16px;
+    color: rgb(255, 200, 50);
+    -unity-text-outline-width: 0.5px;
+    -unity-text-outline-color: rgba(255, 200, 50, 0.3);
+}
+
+/* ════════════════════════════════════════════
+   PARTY STATUS — 右下横並び
+   ════════════════════════════════════════════ */
+.party-status {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    height: 130px;
+    flex-direction: row;
+    align-items: flex-end;
+    overflow: visible;
+}
+
+.ps-card {
+    width: 250px;
+    height: 115px;
+    margin-left: 4px;
+    overflow: visible;
+
+    transition-property: scale, translate;
+    transition-duration: 0.08s;
+    transition-timing-function: ease-out;
+}
+
+.ps-card-visual {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 250px;
+    height: 115px;
+    overflow: visible;
+}
+
+.ps-card-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 250px;
+    height: 115px;
+    background-color: rgb(0, 0, 0);
+    border-top-width: 3px;
+    border-top-color: rgb(230, 0, 18);
+    border-bottom-width: 3px;
+    border-bottom-color: rgb(230, 0, 18);
+    border-left-width: 0;
+    border-right-width: 0;
+    padding: 10px 16px 8px 16px;
+    overflow: visible;
+
+    transition-property: border-top-color, border-bottom-color;
+    transition-duration: 0.08s;
+}
+
+.ps-watermark {
+    position: absolute;
+    right: -6px;
+    top: -16px;
+    width: 260px;
+    height: 90px;
+    font-size: 80px;
+    -unity-font-style: bold;
+    color: rgba(230, 0, 18, 0.04);
+    letter-spacing: -6px;
+    rotate: -12deg;
+    overflow: visible;
+}
+
+.ps-active .ps-card-inner {
+    border-top-color: rgb(0, 255, 255);
+    border-bottom-color: rgb(0, 255, 255);
+}
+.ps-active {
+    scale: 1.08;
+    translate: 0 -10px;
+}
+
+.ps-card-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 218px;
+    height: 36px;
+    margin-bottom: 4px;
+    overflow: visible;
+}
+
+.ps-char-name {
+    font-size: 30px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+    letter-spacing: -1px;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.95);
+    rotate: -4deg;
+    translate: -6px -10px;
+    overflow: visible;
+}
+
+.ps-hp-text {
+    font-size: 18px;
+    color: rgba(200, 200, 215, 0.85);
+    -unity-font-style: bold;
+    -unity-text-outline-width: 0.5px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.8);
+}
+
+.ps-hp-bar-bg {
+    width: 218px;
+    height: 8px;
+    background-color: rgb(51, 51, 51);
+    margin-bottom: 5px;
+    border-radius: 0;
+}
+
+.ps-hp-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 8px;
+    background-color: rgb(255, 255, 255);
+    border-radius: 0;
+
+    transition-property: width;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+.ps-hp-bar-lag {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 8px;
+    background-color: rgba(230, 0, 18, 0.4);
+    border-radius: 0;
+
+    transition-property: width;
+    transition-duration: 1.0s;
+    transition-timing-function: ease-in;
+}
+
+.ps-ep-bar-bg {
+    width: 218px;
+    height: 4px;
+    background-color: rgb(51, 51, 51);
+    border-radius: 0;
+}
+
+.ps-ep-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 4px;
+    background-color: rgb(0, 255, 255);
+    border-radius: 0;
+
+    transition-property: width;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+.ps-low-hp .ps-hp-bar-fill { background-color: rgb(255, 70, 20); }
+.ps-dead { opacity: 0.12; }
+.ps-dead .ps-hp-bar-fill { background-color: rgb(35, 35, 35); }
+
+/* ════════════════════════════════════════════
+   背景装飾（骨組みでは無効化）
+   クラスは残すが表示しない
+   ════════════════════════════════════════════ */
+.bg-typo-1, .bg-typo-2, .bg-typo-3 { display: none; }
+.bg-slash-1, .bg-slash-2, .bg-slash-3 { display: none; }

@@ -1,0 +1,111 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         xmlns:uie="UnityEditor.UIElements"
+         xsi="http://www.w3.org/2001/XMLSchema-instance"
+         engine="UnityEngine.UIElements"
+         editor="UnityEditor.UIElements"
+         noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd">
+
+    <Style src="BattleUI.uss" />
+
+    <ui:VisualElement name="battle-ui-root" class="battle-ui-root">
+
+        <!-- 背景装飾（USSでdisplay:noneにしている。装飾追加時に有効化） -->
+        <ui:Label text="DESTROY" class="bg-typo-1" />
+        <ui:Label text="EXECUTE" class="bg-typo-2" />
+        <ui:Label text="BATTLE" class="bg-typo-3" />
+        <ui:VisualElement class="bg-slash-1" />
+        <ui:VisualElement class="bg-slash-2" />
+        <ui:VisualElement class="bg-slash-3" />
+
+        <!-- ======== COMMAND MENU ======== -->
+        <ui:VisualElement name="command-menu" class="command-menu">
+
+            <ui:Label name="cmd-watermark" text="COMMAND" class="cmd-watermark" />
+
+            <ui:VisualElement class="active-char-name-wrap">
+                <ui:Label name="active-char-name" text="PROTAGONIST" class="active-char-name" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="sp-gauge-wrap">
+                <ui:VisualElement name="sp-gauge" class="sp-gauge">
+                    <ui:Label text="SP" class="sp-label" />
+                    <ui:VisualElement name="sp-pips" class="sp-pips" />
+                    <ui:Label name="sp-value" text="3/5" class="sp-value" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="command-buttons" class="command-buttons">
+
+                <ui:VisualElement name="cmd-archetype" class="cmd-button cmd-slot-0">
+                    <ui:VisualElement class="cmd-button-visual">
+                        <ui:VisualElement class="cmd-button-bg" />
+                        <ui:VisualElement class="cmd-slash-accent" />
+                        <ui:VisualElement class="cmd-accent-line" />
+                        <ui:Label text="ARCHETYPE" class="cmd-button-label" />
+                        <ui:Label text="// PERSONA" class="cmd-button-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="cmd-weapon" class="cmd-button cmd-slot-1">
+                    <ui:VisualElement class="cmd-button-visual">
+                        <ui:VisualElement class="cmd-button-bg" />
+                        <ui:VisualElement class="cmd-slash-accent" />
+                        <ui:VisualElement class="cmd-accent-line" />
+                        <ui:Label text="WEAPON" class="cmd-button-label" />
+                        <ui:Label text="// STRIKE" class="cmd-button-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="cmd-synthesis" class="cmd-button cmd-slot-2">
+                    <ui:VisualElement class="cmd-button-visual">
+                        <ui:VisualElement class="cmd-button-bg" />
+                        <ui:VisualElement class="cmd-slash-accent" />
+                        <ui:VisualElement class="cmd-accent-line" />
+                        <ui:Label text="SYNTHESIS" class="cmd-button-label" />
+                        <ui:Label text="// COMBINE" class="cmd-button-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="cmd-item" class="cmd-button cmd-slot-3">
+                    <ui:VisualElement class="cmd-button-visual">
+                        <ui:VisualElement class="cmd-button-bg" />
+                        <ui:VisualElement class="cmd-slash-accent" />
+                        <ui:VisualElement class="cmd-accent-line" />
+                        <ui:Label text="ITEM" class="cmd-button-label" />
+                        <ui:Label text="// USE" class="cmd-button-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="cmd-guard" class="cmd-button cmd-slot-4">
+                    <ui:VisualElement class="cmd-button-visual">
+                        <ui:VisualElement class="cmd-button-bg" />
+                        <ui:VisualElement class="cmd-slash-accent" />
+                        <ui:VisualElement class="cmd-accent-line" />
+                        <ui:Label text="GUARD" class="cmd-button-label" />
+                        <ui:Label text="// DEFEND" class="cmd-button-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+
+            <ui:VisualElement name="target-panel" class="target-panel hidden" />
+
+            <ui:VisualElement class="cmd-hint-wrap">
+                <ui:Label name="cmd-hint" text="[Z] Confirm  [X] Cancel  [↑↓] Select" class="cmd-hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ======== ACTION ORDER GAUGE ======== -->
+        <ui:VisualElement name="action-order-gauge" class="action-order-gauge">
+            <ui:Label text="ACTION" class="aog-title" />
+            <ui:Label text="ORDER" class="aog-watermark" />
+            <ui:VisualElement name="aog-track" class="aog-track">
+                <ui:VisualElement class="aog-line" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ======== PARTY STATUS ======== -->
+        <ui:VisualElement name="party-status" class="party-status" />
+
+    </ui:VisualElement>
+</ui:UXML>

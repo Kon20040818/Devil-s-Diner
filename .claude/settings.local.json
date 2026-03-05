@@ -32,7 +32,8 @@
       "WebFetch(domain:www.prydwen.gg)",
       "WebFetch(domain:landofgames.ru)",
       "WebFetch(domain:gameui.matme.info)",
-      "WebFetch(domain:gamerch.com)"
+      "WebFetch(domain:gamerch.com)",
+      "WebFetch(domain:gamers-high.com)"
     ],
     "additionalDirectories": [
       "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts",

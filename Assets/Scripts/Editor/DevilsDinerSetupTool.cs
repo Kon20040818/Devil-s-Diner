@@ -12,6 +12,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 /// <summary>
 /// メニュー <c>DevilsDiner > Auto Setup Battle Scene</c> から
@@ -270,6 +271,11 @@ public static class DevilsDinerSetupTool
         // ════════════════════════════════════════════════
         CreateBattleCanvas();
 
+        // ════════════════════════════════════════════════
+        // 9. MetaphorBattleUI (UI Toolkit) — メタファー風UI
+        // ════════════════════════════════════════════════
+        CreateMetaphorBattleUI();
+
         Debug.Log("[DevilsDiner] シーン階層構築完了。");
     }
 
@@ -457,8 +463,8 @@ public static class DevilsDinerSetupTool
         uiManagerSO.FindProperty("_ultimatePortraitUI").objectReferenceValue = ultimateGO.GetComponent<UltimatePortraitUI>();
         uiManagerSO.FindProperty("_damageNumberUI").objectReferenceValue = damageNumUI;
         uiManagerSO.FindProperty("_battleEffectsUI").objectReferenceValue = effectsGO.GetComponent<BattleEffectsUI>();
-        uiManagerSO.FindProperty("_autoToggleButton").objectReferenceValue = autoBtn.GetComponent<Button>();
-        uiManagerSO.FindProperty("_speedToggleButton").objectReferenceValue = speedBtn.GetComponent<Button>();
+        uiManagerSO.FindProperty("_autoToggleButton").objectReferenceValue = autoBtn.GetComponent<UnityEngine.UI.Button>();
+        uiManagerSO.FindProperty("_speedToggleButton").objectReferenceValue = speedBtn.GetComponent<UnityEngine.UI.Button>();
         uiManagerSO.FindProperty("_autoToggleText").objectReferenceValue = autoBtn.GetComponentInChildren<Text>();
         uiManagerSO.FindProperty("_speedToggleText").objectReferenceValue = speedBtn.GetComponentInChildren<Text>();
         uiManagerSO.ApplyModifiedPropertiesWithoutUndo();
@@ -474,10 +480,10 @@ public static class DevilsDinerSetupTool
         btnGO.transform.SetParent(parent, false);
 
         // ダーク丸角風背景
-        var btnImage = btnGO.AddComponent<Image>();
+        var btnImage = btnGO.AddComponent<UnityEngine.UI.Image>();
         btnImage.color = TOGGLE_BG_COLOR;
 
-        var btn = btnGO.AddComponent<Button>();
+        var btn = btnGO.AddComponent<UnityEngine.UI.Button>();
         btn.targetGraphic = btnImage;
 
         // ボタンの色遷移設定
@@ -519,6 +525,45 @@ public static class DevilsDinerSetupTool
         textOutline.effectDistance = new Vector2(1f, -1f);
 
         return btnGO;
+    }
+
+    // ──────────────────────────────────────────────
+    // MetaphorBattleUI (UI Toolkit) 生成
+    // ──────────────────────────────────────────────
+
+    private static void CreateMetaphorBattleUI()
+    {
+        var go = new GameObject("MetaphorBattleUI");
+
+        var uiDocument = go.AddComponent<UIDocument>();
+
+        var uxml = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/BattleUI.uxml");
+        if (uxml != null)
+            uiDocument.visualTreeAsset = uxml;
+        else
+            Debug.LogWarning("[DevilsDiner] Assets/UI/BattleUI.uxml が見つかりません。");
+
+        var panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/UI/BattlePanelSettings.asset");
+        if (panelSettings != null)
+            uiDocument.panelSettings = panelSettings;
+        else
+            Debug.LogWarning("[DevilsDiner] Assets/UI/BattlePanelSettings.asset が見つかりません。");
+
+        go.AddComponent<BattleUIController>();
+
+        // 旧uGUI UIを非アクティブ化
+        foreach (var legacy in Object.FindObjectsByType<SkillCommandUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            legacy.gameObject.SetActive(false);
+        foreach (var legacy in Object.FindObjectsByType<ActionTimelineUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            legacy.gameObject.SetActive(false);
+        foreach (var legacy in Object.FindObjectsByType<CharacterStatusUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            legacy.gameObject.SetActive(false);
+        foreach (var legacy in Object.FindObjectsByType<UltimatePortraitUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            legacy.gameObject.SetActive(false);
+        var toggleButtons = GameObject.Find("ToggleButtons");
+        if (toggleButtons != null) toggleButtons.SetActive(false);
+
+        Debug.Log("[DevilsDiner] MetaphorBattleUI (UI Toolkit) を構築しました。");
     }
 
     // ================================================================

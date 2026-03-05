@@ -95,5 +95,13 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
             uiManager.Initialize(battleManager);
             Debug.Log("[BattleSceneBootstrap] BattleUIManager を初期化しました。");
         }
+
+        // ── BattleUIController（Metaphor UI）検索・初期化 ──
+        BattleUIController battleUIController = FindFirstObjectByType<BattleUIController>();
+        if (battleUIController != null)
+        {
+            battleUIController.Initialize(battleManager);
+            Debug.Log("[BattleSceneBootstrap] BattleUIController (Metaphor UI) を初期化しました。");
+        }
     }
 }
