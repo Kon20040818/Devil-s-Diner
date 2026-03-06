@@ -52,28 +52,28 @@
                 <ui:VisualElement name="command-buttons" class="command-buttons">
 
                     <!-- △○×□ 十字配置: 中心(-150, -30) 縦150 横220 -->
-                    <ui:VisualElement name="cmd-archetype" class="cmd-slot" style="translate: -150px -180px;">
+                    <ui:VisualElement name="cmd-attack" class="cmd-slot" style="translate: -150px -180px;">
                         <ui:VisualElement class="cmd-bg" />
-                        <ui:Label text="△ ARCHETYPE" class="cmd-text" />
-                        <ui:Label text="// PERSONA" class="cmd-sub" />
-                    </ui:VisualElement>
-
-                    <ui:VisualElement name="cmd-weapon" class="cmd-slot" style="translate: 70px -30px;">
-                        <ui:VisualElement class="cmd-bg" />
-                        <ui:Label text="○ WEAPON" class="cmd-text" />
+                        <ui:Label text="△ ATTACK" class="cmd-text" />
                         <ui:Label text="// STRIKE" class="cmd-sub" />
                     </ui:VisualElement>
 
-                    <ui:VisualElement name="cmd-synthesis" class="cmd-slot" style="translate: -370px -30px;">
+                    <ui:VisualElement name="cmd-skill" class="cmd-slot" style="translate: 70px -30px;">
                         <ui:VisualElement class="cmd-bg" />
-                        <ui:Label text="× SYNTHESIS" class="cmd-text" />
-                        <ui:Label text="// COMBINE" class="cmd-sub" />
+                        <ui:Label text="○ SKILL" class="cmd-text" />
+                        <ui:Label text="// ABILITY" class="cmd-sub" />
                     </ui:VisualElement>
 
-                    <ui:VisualElement name="cmd-item" class="cmd-slot" style="translate: -150px 120px;">
+                    <ui:VisualElement name="cmd-meal" class="cmd-slot" style="translate: -370px -30px;">
                         <ui:VisualElement class="cmd-bg" />
-                        <ui:Label text="□ ITEM" class="cmd-text" />
-                        <ui:Label text="// USE" class="cmd-sub" />
+                        <ui:Label text="× MEAL" class="cmd-text" />
+                        <ui:Label text="// HEAL" class="cmd-sub" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="cmd-scout" class="cmd-slot" style="translate: -150px 120px;">
+                        <ui:VisualElement class="cmd-bg" />
+                        <ui:Label text="□ SCOUT" class="cmd-text" />
+                        <ui:Label text="// RECRUIT" class="cmd-sub" />
                     </ui:VisualElement>
 
                     <ui:VisualElement name="cmd-guard" class="cmd-slot" style="translate: -150px 200px;">

@@ -69,16 +69,16 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
     private static readonly string[] CMD_NAMES =
     {
-        "cmd-archetype", "cmd-weapon", "cmd-synthesis", "cmd-item", "cmd-guard"
+        "cmd-attack", "cmd-skill", "cmd-meal", "cmd-scout", "cmd-guard"
     };
 
     // UXML inline translate値（△○×□ 十字配置 — 中心(-150,-30) 縦150 横220）
     private static readonly Vector2[] SLOT_BASE_TRANSLATE =
     {
-        new Vector2(-150f, -180f),  // △ ARCHETYPE 上
-        new Vector2(  70f,  -30f),  // ○ WEAPON 右
-        new Vector2(-370f,  -30f),  // × SYNTHESIS 左
-        new Vector2(-150f,  120f),  // □ ITEM 下
+        new Vector2(-150f, -180f),  // △ ATTACK 上
+        new Vector2(  70f,  -30f),  // ○ SKILL 右
+        new Vector2(-370f,  -30f),  // × MEAL 左
+        new Vector2(-150f,  120f),  // □ SCOUT 下
         new Vector2(-150f,  200f),  // GUARD 下寄り
     };
 
