@@ -86,6 +86,15 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
             uiManager.SetUltimatePortraitUI(ultimatePortraitUI);
         }
 
+        // ── AttackAction（ジャストアタック）検索・自動生成・結線 ──
+        AttackAction attackAction = FindFirstObjectByType<AttackAction>();
+        if (attackAction == null)
+        {
+            attackAction = gameObject.AddComponent<AttackAction>();
+            Debug.Log("[BattleSceneBootstrap] AttackAction を自動生成しました。");
+        }
+        battleManager.SetAttackAction(attackAction);
+
         // ── バトル開始（パーティ配列をセットし、キューを構築する） ──
         battleManager.StartBattle(playerList.ToArray(), enemyList.ToArray());
 

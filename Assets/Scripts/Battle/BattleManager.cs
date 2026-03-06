@@ -125,6 +125,17 @@ public sealed class BattleManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
+    // AttackAction（ジャストアタック）参照
+    // ──────────────────────────────────────────────
+
+    private AttackAction _attackAction;
+
+    public void SetAttackAction(AttackAction attackAction)
+    {
+        _attackAction = attackAction;
+    }
+
+    // ──────────────────────────────────────────────
     // 公開 API — バトル開始
     // ──────────────────────────────────────────────
 
@@ -343,7 +354,29 @@ public sealed class BattleManager : MonoBehaviour
                 break;
         }
 
-        // ── ダメージ計算・適用 ──
+        // ── 味方通常攻撃 + AttackAction 存在時：ジャストアタック分岐 ──
+        bool useJustAttack = _selectedAction == CharacterBattleController.ActionType.BasicAttack
+            && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Player
+            && _attackAction != null;
+
+        if (useJustAttack)
+        {
+            yield return StartCoroutine(ExecuteJustAttack());
+        }
+        else
+        {
+            yield return StartCoroutine(ExecuteNormalDamage());
+        }
+
+        yield return StartCoroutine(TurnEnd());
+    }
+
+    // ──────────────────────────────────────────────
+    // 通常ダメージ処理（スキル・必殺技・敵攻撃・非ジャスト通常攻撃）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteNormalDamage()
+    {
         int damage = _activeCharacter.CalculateDamage(_selectedAction);
         CharacterStats.ElementType element = _activeCharacter.Stats != null
             ? _activeCharacter.Stats.Element
@@ -351,7 +384,6 @@ public sealed class BattleManager : MonoBehaviour
 
         int dealt = _selectedTarget.TakeDamage(damage, element, _activeCharacter);
 
-        // ── ダメージイベント通知 ──
         var damageResult = new CharacterBattleController.DamageResult
         {
             FinalDamage = dealt,
@@ -363,7 +395,6 @@ public sealed class BattleManager : MonoBehaviour
         };
         OnDamageDealt?.Invoke(damageResult);
 
-        // ── カメラシェイク（アクション種別で強度変更）──
         if (_cameraManager != null)
         {
             switch (_selectedAction)
@@ -382,7 +413,6 @@ public sealed class BattleManager : MonoBehaviour
                     break;
             }
 
-            // 靭性破壊シェイク（通常シェイクに追加）
             if (damageResult.CausedBreak)
                 _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BREAK);
         }
@@ -395,10 +425,8 @@ public sealed class BattleManager : MonoBehaviour
         };
         Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} の{actionName} → {_selectedTarget.DisplayName} に {dealt} ダメージ！");
 
-        // ── リソース獲得 ──
         if (_selectedAction == CharacterBattleController.ActionType.BasicAttack)
         {
-            // 通常攻撃: SP+1, EP獲得
             AddSP(1);
         }
 
@@ -406,8 +434,65 @@ public sealed class BattleManager : MonoBehaviour
         if (epGain > 0) _activeCharacter.AddEP(epGain);
 
         yield return new WaitForSeconds(_executeAnimDuration);
+    }
 
-        yield return StartCoroutine(TurnEnd());
+    // ──────────────────────────────────────────────
+    // ジャストアタック処理（AttackAction 連携・複数ヒット）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteJustAttack()
+    {
+        int baseDamage = _activeCharacter.CalculateDamage(_selectedAction);
+        CharacterStats.ElementType element = _activeCharacter.Stats != null
+            ? _activeCharacter.Stats.Element
+            : CharacterStats.ElementType.Physical;
+
+        int totalDealt = 0;
+        int hitCount = _attackAction.HitCount;
+        // 各ヒットのダメージはヒット数で均等分割
+        int perHitDamage = Mathf.Max(1, baseDamage / hitCount);
+
+        yield return StartCoroutine(_attackAction.ExecuteAttackCoroutine((hitIndex, isJust) =>
+        {
+            if (_selectedTarget == null || !_selectedTarget.IsAlive) return;
+
+            int hitDamage = isJust
+                ? Mathf.RoundToInt(perHitDamage * _attackAction.JustMultiplier)
+                : perHitDamage;
+
+            int dealt = _selectedTarget.TakeDamage(hitDamage, element, _activeCharacter);
+            totalDealt += dealt;
+
+            var damageResult = new CharacterBattleController.DamageResult
+            {
+                FinalDamage = dealt,
+                Element = element,
+                IsWeakness = _selectedTarget.Stats != null && _selectedTarget.Stats.IsWeakTo(element),
+                CausedBreak = _selectedTarget.IsBroken && _selectedTarget.CurrentToughness <= 0,
+                Target = _selectedTarget,
+                Attacker = _activeCharacter
+            };
+            OnDamageDealt?.Invoke(damageResult);
+
+            if (_cameraManager != null)
+            {
+                _cameraManager.ShakeCamera(isJust
+                    ? BattleCameraManager.SHAKE_SKILL_HIT
+                    : BattleCameraManager.SHAKE_BASIC_HIT);
+
+                if (damageResult.CausedBreak)
+                    _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BREAK);
+            }
+
+            Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} Hit {hitIndex + 1}{(isJust ? " (JUST!)" : "")} → {_selectedTarget.DisplayName} に {dealt} ダメージ！");
+        }));
+
+        Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} ジャストアタック合計 → {totalDealt} ダメージ！");
+
+        // 通常攻撃: SP+1, EP獲得
+        AddSP(1);
+        int epGain = _activeCharacter.GetEPGain(_selectedAction);
+        if (epGain > 0) _activeCharacter.AddEP(epGain);
     }
 
     private IEnumerator TurnEnd()

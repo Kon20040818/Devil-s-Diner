@@ -730,36 +730,48 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         if (_mode == UIMode.Hidden) return;
 
         var kb = Keyboard.current;
-        if (kb == null) return;
+        var gp = Gamepad.current;
 
         if (_mode == UIMode.CommandSelect)
         {
-            // △○×□ ダイレクト選択
-            if (kb.wKey.wasPressedThisFrame)       // △ ARCHETYPE
-                SelectAndConfirmCommand(0);
-            else if (kb.dKey.wasPressedThisFrame)   // ○ WEAPON
-                SelectAndConfirmCommand(1);
-            else if (kb.aKey.wasPressedThisFrame)   // × SYNTHESIS
-                SelectAndConfirmCommand(2);
-            else if (kb.sKey.wasPressedThisFrame)   // □ ITEM
-                SelectAndConfirmCommand(3);
-            else if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)  // GUARD
-                SelectAndConfirmCommand(4);
+            // △○×□ ダイレクト選択（キーボード + ゲームパッド）
+            bool cmdTriangle = (kb != null && kb.wKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonNorth.wasPressedThisFrame);
+            bool cmdCircle   = (kb != null && kb.dKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonEast.wasPressedThisFrame);
+            bool cmdCross    = (kb != null && kb.aKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cmdSquare   = (kb != null && kb.sKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonWest.wasPressedThisFrame);
+            bool cmdGuard    = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                            || (gp != null && gp.rightShoulder.wasPressedThisFrame);
+            bool cmdCancel   = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                            || (gp != null && gp.leftShoulder.wasPressedThisFrame);
 
-            if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
-                HideCommandMenu();
+            if (cmdTriangle)     SelectAndConfirmCommand(0);  // △ ARCHETYPE
+            else if (cmdCircle)  SelectAndConfirmCommand(1);  // ○ WEAPON
+            else if (cmdCross)   SelectAndConfirmCommand(2);  // × SYNTHESIS
+            else if (cmdSquare)  SelectAndConfirmCommand(3);  // □ ITEM
+            else if (cmdGuard)   SelectAndConfirmCommand(4);  // GUARD
+
+            if (cmdCancel) HideCommandMenu();
         }
         else if (_mode == UIMode.TargetSelect)
         {
-            if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame)
-                NavigateTarget(-1);
-            else if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame)
-                NavigateTarget(+1);
+            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.up.wasPressedThisFrame);
+            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
+            bool confirm = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cancel  = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
 
-            if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
-                ConfirmTarget();
-            if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
-                ReturnToCommandMode();
+            if (navUp)   NavigateTarget(-1);
+            else if (navDown) NavigateTarget(+1);
+
+            if (confirm) ConfirmTarget();
+            if (cancel)  ReturnToCommandMode();
         }
     }
 
