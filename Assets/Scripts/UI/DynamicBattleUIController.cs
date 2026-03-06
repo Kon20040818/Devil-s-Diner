@@ -1,15 +1,16 @@
 // ============================================================
-// BattleUIController.cs
-// メタファー:リファンタジオ風バトルUI統合コントローラー。
-// UI Toolkit (UIDocument) ベースで、コマンドメニュー・行動順ゲージ・
-// パーティステータスの3要素を管理する。
-// 既存の uGUI 版 UI (SkillCommandUI, ActionTimelineUI, CharacterStatusUI)
-// を完全に置き換える。
+// DynamicBattleUIController.cs
+// メタファー:リファンタジオ風バトルUI — 3層ジオメトリ + ダイナミック追従
 //
-// 【設計方針】
-// - rotate は配置コンテナではなくビジュアル子要素にのみ適用
-// - AOG はプール方式で VisualElement を再利用
-// - TryResolve パターンで UIDocument 遅延構築に対応
+// 【構造】
+// RadialPivot: rotate:12deg（唯一の回転） — 空間傾斜（右斜め下）
+// cmd-slot: inline translate — Cカーブ配置（30px極薄リボン）
+// cmd-bg: 回転なし — 黒半透明の土台（将来テクスチャ差替え用）
+//
+// 【ダイナミック追従】
+// ・SmoothDamp による遅延追従（重量感）
+// ・カメラ差分による視差効果（parallax-bg / radial-pivot で係数差）
+// ・パースペクティブ偽装（カメラ回り込み時の ScaleX / Rotate 微調整）
 // ============================================================
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 [RequireComponent(typeof(UIDocument))]
-public sealed class BattleUIController : MonoBehaviour
+public sealed class DynamicBattleUIController : MonoBehaviour
 {
     // ──────────────────────────────────────────────
     // 列挙
@@ -35,6 +36,28 @@ public sealed class BattleUIController : MonoBehaviour
     private const float LOW_HP_THRESHOLD = 0.3f;
     private const float LAG_SPEED = 2.5f;
 
+    // SmoothDamp パラメータ
+    private const float SMOOTH_TIME = 0.12f;           // 追従の柔らかさ（秒）
+    private const float MAX_SPEED = 4000f;              // 最大追従速度（px/s）
+
+    // 視差効果係数（カメラ差分に対する感度）
+    private const float PARALLAX_BG_FACTOR = 0.35f;     // 背景レイヤー（大きく動く）
+    private const float PARALLAX_CMD_FACTOR = 0.08f;    // コマンドレイヤー（わずかに動く）
+
+    // パースペクティブ偽装
+    private const float PERSPECTIVE_ROTATE_FACTOR = 2.5f;   // カメラYaw差分→Rotate(deg)
+    private const float PERSPECTIVE_SCALE_FACTOR = 0.04f;   // カメラYaw差分→ScaleX増減
+    private const float PERSPECTIVE_BASE_ROTATE = 8f;       // ベース傾斜角（右斜め下に傾ける）
+
+    // キャラ名・SP・ヒントのオフセット（パネル座標、radial-pivot基準ではなくプレイヤー基準）
+    private const float INFO_OFFSET_X = -100f;
+    private const float INFO_OFFSET_Y = -260f;
+    private const float HINT_OFFSET_X = -140f;
+    private const float HINT_OFFSET_Y = 210f;
+
+    // ワールド→スクリーン変換でのキャラ高さ補正
+    private const float WORLD_Y_OFFSET = 0.6f;
+
     private static readonly CharacterBattleController.ActionType[] SLOT_TO_ACTION =
     {
         CharacterBattleController.ActionType.Skill,        // ARCHETYPE
@@ -48,6 +71,18 @@ public sealed class BattleUIController : MonoBehaviour
     {
         "cmd-archetype", "cmd-weapon", "cmd-synthesis", "cmd-item", "cmd-guard"
     };
+
+    // UXML inline translate値（△○×□ 十字配置 — 中心(-150,-30) 縦150 横220）
+    private static readonly Vector2[] SLOT_BASE_TRANSLATE =
+    {
+        new Vector2(-150f, -180f),  // △ ARCHETYPE 上
+        new Vector2(  70f,  -30f),  // ○ WEAPON 右
+        new Vector2(-370f,  -30f),  // × SYNTHESIS 左
+        new Vector2(-150f,  120f),  // □ ITEM 下
+        new Vector2(-150f,  200f),  // GUARD 下寄り
+    };
+
+    private const float ACTIVE_SHIFT_X = 16f; // is-active 時の右シフト
 
     // ──────────────────────────────────────────────
     // ランタイム
@@ -64,24 +99,41 @@ public sealed class BattleUIController : MonoBehaviour
     private CharacterBattleController.ActionType _pendingAction;
     private readonly List<CharacterBattleController> _targetList = new List<CharacterBattleController>();
 
+    // SmoothDamp 状態
+    private Vector2 _currentPanelPos;
+    private Vector2 _panelVelocity;
+
+    // 視差・パースペクティブ用カメラ追跡
+    private Vector3 _prevCamEuler;
+    private Vector3 _prevCamPos;
+    private Vector2 _parallaxBgOffset;
+    private float _perspectiveRotate;
+    private float _perspectiveScaleX;
+
     // ──────────────────────────────────────────────
     // UXML要素キャッシュ
     // ──────────────────────────────────────────────
 
     private VisualElement _root;
 
+    // 視差背景
+    private VisualElement _parallaxBg;
+
     // Command Menu
     private VisualElement _commandMenu;
+    private VisualElement _cmdRadialPivot;
     private VisualElement _commandButtons;
     private VisualElement _targetPanel;
+    private VisualElement _cmdInfoGroup;
     private Label _activeCharName;
     private Label _cmdWatermark;
     private VisualElement _spPips;
     private Label _spValue;
+    private VisualElement _cmdHintWrap;
     private Label _cmdHint;
     private readonly VisualElement[] _cmdButtonElements = new VisualElement[COMMAND_COUNT];
 
-    // Action Order Gauge（プール）
+    // Action Order Gauge
     private VisualElement _aogTrack;
     private readonly List<AOGEntry> _aogPool = new List<AOGEntry>();
     private int _aogActiveCount;
@@ -114,8 +166,6 @@ public sealed class BattleUIController : MonoBehaviour
         public VisualElement EPFill;
         public float LagPercent;
         public float TargetPercent;
-
-        // イベントハンドラ参照（解除用）
         public Action<int, int> HPHandler;
         public Action<int, int> EPHandler;
     }
@@ -165,6 +215,8 @@ public sealed class BattleUIController : MonoBehaviour
         }
 
         HandleInput();
+        UpdateCameraTracking();
+        UpdateDynamicPositions();
         UpdatePartyCardLag();
     }
 
@@ -181,7 +233,6 @@ public sealed class BattleUIController : MonoBehaviour
                 _battleManager.Queue.OnQueueUpdated -= HandleQueueUpdated;
         }
 
-        // パーティカードのイベント解除（メソッド参照で確実に解除）
         foreach (var card in _partyCards)
         {
             if (card.Character == null) continue;
@@ -191,7 +242,7 @@ public sealed class BattleUIController : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════
-    // UI解決（TryResolveパターン）
+    // UI解決（TryResolve パターン）
     // ════════════════════════════════════════════════
 
     private bool TryResolveUI()
@@ -205,24 +256,27 @@ public sealed class BattleUIController : MonoBehaviour
         _root = rootVE.Q<VisualElement>("battle-ui-root");
         if (_root == null) return false;
 
-        _commandMenu = _root.Q<VisualElement>("command-menu");
-        _commandButtons = _root.Q<VisualElement>("command-buttons");
-        _targetPanel = _root.Q<VisualElement>("target-panel");
-        _activeCharName = _root.Q<Label>("active-char-name");
-        _cmdWatermark = _root.Q<Label>("cmd-watermark");
-        _spPips = _root.Q<VisualElement>("sp-pips");
-        _spValue = _root.Q<Label>("sp-value");
-        _cmdHint = _root.Q<Label>("cmd-hint");
+        _parallaxBg      = _root.Q<VisualElement>("parallax-bg");
+        _commandMenu      = _root.Q<VisualElement>("command-menu");
+        _cmdRadialPivot   = _root.Q<VisualElement>("cmd-radial-pivot");
+        _commandButtons   = _root.Q<VisualElement>("command-buttons");
+        _targetPanel      = _root.Q<VisualElement>("target-panel");
+        _cmdInfoGroup     = _root.Q<VisualElement>("cmd-info-group");
+        _activeCharName   = _root.Q<Label>("active-char-name");
+        _cmdWatermark     = _root.Q<Label>("cmd-watermark");
+        _spPips           = _root.Q<VisualElement>("sp-pips");
+        _spValue          = _root.Q<Label>("sp-value");
+        _cmdHintWrap      = _root.Q<VisualElement>("cmd-hint-wrap");
+        _cmdHint          = _root.Q<Label>("cmd-hint");
 
-        // コマンドボタンを全部nullチェック付きで取得
         bool allFound = true;
         for (int i = 0; i < COMMAND_COUNT; i++)
         {
             _cmdButtonElements[i] = _root.Q<VisualElement>(CMD_NAMES[i]);
-            if (_cmdButtonElements[i] == null) allFound = false;
+            if (_cmdButtonElements[i] == null) { allFound = false; continue; }
 
             int idx = i;
-            _cmdButtonElements[i]?.RegisterCallback<ClickEvent>(_ =>
+            _cmdButtonElements[i].RegisterCallback<ClickEvent>(_ =>
             {
                 if (_mode == UIMode.CommandSelect)
                 {
@@ -233,12 +287,13 @@ public sealed class BattleUIController : MonoBehaviour
             });
         }
 
-        _aogTrack = _root.Q<VisualElement>("aog-track");
+        _aogTrack    = _root.Q<VisualElement>("aog-track");
         _partyStatus = _root.Q<VisualElement>("party-status");
 
-        if (_commandMenu == null || _aogTrack == null || _partyStatus == null || !allFound)
+        if (_commandMenu == null || _cmdRadialPivot == null ||
+            _aogTrack == null || _partyStatus == null || !allFound)
         {
-            Debug.LogWarning("[BattleUIController] 一部のUI要素が見つかりません。次フレームでリトライします。");
+            Debug.LogWarning("[DynamicBattleUI] 一部のUI要素が見つかりません。次フレームでリトライします。");
             return false;
         }
 
@@ -248,7 +303,6 @@ public sealed class BattleUIController : MonoBehaviour
 
     private void SetupAfterResolve()
     {
-        // rootVisualElement にサイズを強制（NaN対策）
         var rootVE = _uiDocument.rootVisualElement;
         rootVE.style.flexGrow = 1;
         rootVE.style.position = Position.Absolute;
@@ -265,13 +319,180 @@ public sealed class BattleUIController : MonoBehaviour
         if (_battleManager.Queue != null)
             _battleManager.Queue.OnQueueUpdated += HandleQueueUpdated;
 
+        // カメラ初期状態を取得
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            _prevCamEuler = cam.transform.eulerAngles;
+            _prevCamPos = cam.transform.position;
+        }
+
+        // 初期位置を即座に設定（SmoothDampの初回ジャンプ防止）
+        _currentPanelPos = GetTargetPanelPos();
+
         BuildSPPips();
         HandleSPChanged(_battleManager.CurrentSP, _battleManager.MaxSP);
         BuildPartyStatusCards();
         PreallocateAOGPool();
         RefreshActionOrder();
 
-        Debug.Log("[BattleUIController] Metaphor UI 初期化完了。");
+        Debug.Log("[DynamicBattleUI] 初期化完了（3層ジオメトリ + SmoothDamp + 視差効果）。");
+    }
+
+    // ════════════════════════════════════════════════
+    // ワールド→パネル座標変換
+    // ════════════════════════════════════════════════
+
+    private Vector2 GetTargetPanelPos()
+    {
+        var cam = Camera.main;
+        if (cam == null || _battleManager == null || _battleManager.ActiveCharacter == null)
+            return new Vector2(700f, 540f);
+
+        Vector3 worldPos = _battleManager.ActiveCharacter.transform.position + Vector3.up * WORLD_Y_OFFSET;
+        Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
+
+        if (screenPos.z < 0)
+            return new Vector2(700f, 540f);
+
+        return ScreenToPanel(new Vector2(screenPos.x, screenPos.y));
+    }
+
+    private Vector2 ScreenToPanel(Vector2 screenPos)
+    {
+        float pw = _root.resolvedStyle.width;
+        float ph = _root.resolvedStyle.height;
+        if (float.IsNaN(pw) || pw <= 0) pw = 1920f;
+        if (float.IsNaN(ph) || ph <= 0) ph = 1080f;
+
+        return new Vector2(
+            screenPos.x / Screen.width * pw,
+            (1f - screenPos.y / Screen.height) * ph
+        );
+    }
+
+    // ════════════════════════════════════════════════
+    // カメラ差分追跡（視差・パースペクティブ計算）
+    // ════════════════════════════════════════════════
+
+    private void UpdateCameraTracking()
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 curEuler = cam.transform.eulerAngles;
+        Vector3 curPos   = cam.transform.position;
+
+        // オイラー角の差分（-180〜+180 に正規化）
+        float dYaw   = Mathf.DeltaAngle(_prevCamEuler.y, curEuler.y);
+        float dPitch = Mathf.DeltaAngle(_prevCamEuler.x, curEuler.x);
+
+        // 移動差分
+        Vector3 dPos = curPos - _prevCamPos;
+
+        // ── 視差効果: カメラの水平移動/回転で背景をずらす ──
+        // Yaw 変化（度）をpx換算して背景に適用
+        float parallaxX = -dYaw * 3f;      // yaw 1度 → 3px
+        float parallaxY = dPitch * 1.5f;    // pitch 変化も微小に反映
+
+        // ワールド移動の水平成分も加える（カメラローカルright方向）
+        float localRightMove = Vector3.Dot(dPos, cam.transform.right);
+        parallaxX += -localRightMove * 15f;
+
+        // 背景レイヤーの視差（大きく動く）
+        _parallaxBgOffset.x += parallaxX * PARALLAX_BG_FACTOR;
+        _parallaxBgOffset.y += parallaxY * PARALLAX_BG_FACTOR;
+
+        // 減衰（フレーム間でゆっくり戻る）
+        _parallaxBgOffset *= 0.96f;
+
+        // ── パースペクティブ偽装: Yaw差分でRotateとScaleXを微調整 ──
+        float perspTarget = -dYaw * PERSPECTIVE_ROTATE_FACTOR;
+        float scaleTarget = 1f + dYaw * PERSPECTIVE_SCALE_FACTOR;
+        scaleTarget = Mathf.Clamp(scaleTarget, 0.92f, 1.08f);
+
+        // 滑らかに追従
+        _perspectiveRotate = Mathf.Lerp(_perspectiveRotate, perspTarget, Time.unscaledDeltaTime * 8f);
+        _perspectiveScaleX = Mathf.Lerp(_perspectiveScaleX, scaleTarget, Time.unscaledDeltaTime * 8f);
+
+        // 減衰（安定時はベースに戻る）
+        _perspectiveRotate *= 0.92f;
+        _perspectiveScaleX = Mathf.Lerp(_perspectiveScaleX, 1f, Time.unscaledDeltaTime * 3f);
+
+        _prevCamEuler = curEuler;
+        _prevCamPos = curPos;
+    }
+
+    // ════════════════════════════════════════════════
+    // 毎フレーム位置更新（SmoothDamp + 視差 + パースペクティブ）
+    // ════════════════════════════════════════════════
+
+    private void UpdateDynamicPositions()
+    {
+        if (_mode == UIMode.Hidden) return;
+
+        float dt = Time.unscaledDeltaTime;
+
+        // ── SmoothDamp でプレイヤー追従 ──
+        Vector2 target = GetTargetPanelPos();
+        _currentPanelPos.x = Mathf.SmoothDamp(
+            _currentPanelPos.x, target.x, ref _panelVelocity.x, SMOOTH_TIME, MAX_SPEED, dt);
+        _currentPanelPos.y = Mathf.SmoothDamp(
+            _currentPanelPos.y, target.y, ref _panelVelocity.y, SMOOTH_TIME, MAX_SPEED, dt);
+
+        // ── Layer 1: RadialPivot ──
+        // translate = SmoothDamp済みプレイヤー位置 + コマンドレイヤー視差
+        if (_cmdRadialPivot != null)
+        {
+            float cmdParallaxX = _parallaxBgOffset.x * (PARALLAX_CMD_FACTOR / PARALLAX_BG_FACTOR);
+            float cmdParallaxY = _parallaxBgOffset.y * (PARALLAX_CMD_FACTOR / PARALLAX_BG_FACTOR);
+
+            _cmdRadialPivot.style.translate = new Translate(
+                _currentPanelPos.x + cmdParallaxX,
+                _currentPanelPos.y + cmdParallaxY
+            );
+
+            // パースペクティブ偽装: rotate と scaleX を微調整
+            float finalRotate = PERSPECTIVE_BASE_ROTATE + _perspectiveRotate;
+            _cmdRadialPivot.style.rotate = new Rotate(Angle.Degrees(finalRotate));
+            _cmdRadialPivot.style.scale = new Scale(new Vector3(_perspectiveScaleX, 1f, 1f));
+        }
+
+        // ── 背景視差レイヤー ──
+        if (_parallaxBg != null)
+        {
+            _parallaxBg.style.translate = new Translate(_parallaxBgOffset.x, _parallaxBgOffset.y);
+        }
+
+        // ── キャラ名 + SP グループ ──
+        if (_cmdInfoGroup != null)
+        {
+            _cmdInfoGroup.style.translate = new Translate(
+                _currentPanelPos.x + INFO_OFFSET_X,
+                _currentPanelPos.y + INFO_OFFSET_Y
+            );
+        }
+
+        // ── ヒント ──
+        if (_cmdHintWrap != null)
+        {
+            _cmdHintWrap.style.translate = new Translate(
+                _currentPanelPos.x + HINT_OFFSET_X,
+                _currentPanelPos.y + HINT_OFFSET_Y
+            );
+        }
+
+        // ── ターゲットパネル追従 ──
+        if (_mode == UIMode.TargetSelect && _targetPanel != null)
+        {
+            for (int i = 0; i < _targetPanel.childCount; i++)
+            {
+                _targetPanel[i].style.translate = new Translate(
+                    _currentPanelPos.x - 130f,
+                    _currentPanelPos.y - 60f + i * 62f
+                );
+            }
+        }
     }
 
     // ════════════════════════════════════════════════
@@ -324,7 +545,7 @@ public sealed class BattleUIController : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════
-    // コマンドメニュー
+    // コマンドメニュー表示/非表示
     // ════════════════════════════════════════════════
 
     private void ShowCommandMenu()
@@ -334,11 +555,13 @@ public sealed class BattleUIController : MonoBehaviour
         _mode = UIMode.CommandSelect;
         _selectedCommandIndex = 0;
 
+        // SmoothDampの初期位置を即座に設定（ジャンプ防止）
+        _currentPanelPos = GetTargetPanelPos();
+        _panelVelocity = Vector2.zero;
+
         var active = _battleManager.ActiveCharacter;
         if (_activeCharName != null && active != null)
             _activeCharName.text = active.DisplayName?.ToUpper() ?? "---";
-
-        // ウォーターマーク更新（キャラ名の巨大背景文字）
         if (_cmdWatermark != null && active != null)
             _cmdWatermark.text = active.DisplayName?.ToUpper() ?? "COMMAND";
 
@@ -347,7 +570,7 @@ public sealed class BattleUIController : MonoBehaviour
 
         _targetPanel?.AddToClassList("hidden");
         _commandButtons?.RemoveFromClassList("hidden");
-        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Cancel  [\u2191\u2193] Select";
+        if (_cmdHint != null) _cmdHint.text = "[W]△ [D]○ [A]× [S]□  [X] Cancel";
 
         _commandMenu.RemoveFromClassList("hidden");
     }
@@ -365,7 +588,6 @@ public sealed class BattleUIController : MonoBehaviour
         for (int i = 0; i < COMMAND_COUNT; i++)
         {
             if (_cmdButtonElements[i] == null) continue;
-
             bool disabled = SLOT_TO_ACTION[i] == CharacterBattleController.ActionType.Skill && !canSkill;
 
             if (disabled)
@@ -382,9 +604,23 @@ public sealed class BattleUIController : MonoBehaviour
             if (_cmdButtonElements[i] == null) continue;
 
             if (i == _selectedCommandIndex)
+            {
                 _cmdButtonElements[i].AddToClassList("is-active");
+                // is-active 時のスライド: USStranslateが上書きされるのでinlineで合成
+                _cmdButtonElements[i].style.translate = new Translate(
+                    SLOT_BASE_TRANSLATE[i].x + ACTIVE_SHIFT_X,
+                    SLOT_BASE_TRANSLATE[i].y
+                );
+            }
             else
+            {
                 _cmdButtonElements[i].RemoveFromClassList("is-active");
+                // 非active: USS値に戻す
+                _cmdButtonElements[i].style.translate = new Translate(
+                    SLOT_BASE_TRANSLATE[i].x,
+                    SLOT_BASE_TRANSLATE[i].y
+                );
+            }
         }
     }
 
@@ -408,7 +644,7 @@ public sealed class BattleUIController : MonoBehaviour
 
         if (_targetList.Count == 0)
         {
-            Debug.LogWarning("[BattleUIController] 生存中のターゲットがいません。");
+            Debug.LogWarning("[DynamicBattleUI] 生存中のターゲットがいません。");
             return;
         }
 
@@ -419,7 +655,7 @@ public sealed class BattleUIController : MonoBehaviour
         RebuildTargetEntries();
         UpdateTargetHighlight();
 
-        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Back  [\u2191\u2193] Select";
+        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Back  [W/S] Select";
     }
 
     private void RebuildTargetEntries()
@@ -427,49 +663,39 @@ public sealed class BattleUIController : MonoBehaviour
         if (_targetPanel == null) return;
         _targetPanel.Clear();
 
-        // ターゲットもコマンドと同じ扇状配置にする
-        // コマンドボタンと同じ弧の位置に重ねて表示
-        int[] xOffsets = { 30, 70, 130, 210, 290 };
-        int[] yOffsets = { 100, 180, 260, 330, 390 };
-        int[] rotations = { -18, -12, -7, -3, 0 };
-
         for (int i = 0; i < _targetList.Count; i++)
         {
             var target = _targetList[i];
-            int slot = Mathf.Min(i, xOffsets.Length - 1);
 
-            var entry = new VisualElement();
-            entry.AddToClassList("target-entry");
-            // absolute配置 + translate で扇状に散らす
-            entry.style.translate = new Translate(xOffsets[slot], yOffsets[slot]);
-            entry.style.rotate = new Rotate(Angle.Degrees(rotations[slot]));
+            // target-slot: cmd-slotと同構造（透明コンテナ）
+            var slot = new VisualElement();
+            slot.AddToClassList("target-slot");
 
-            var visual = new VisualElement();
-            visual.AddToClassList("target-entry-visual");
-
+            // target-bg: 黒半透明の土台（回転なし）
             var bg = new VisualElement();
-            bg.AddToClassList("target-entry-bg");
+            bg.AddToClassList("target-bg");
 
+            // target-text: 敵名（歪みなし）
             var nameLabel = new Label(target.DisplayName?.ToUpper() ?? "???");
-            nameLabel.AddToClassList("target-entry-name");
+            nameLabel.AddToClassList("target-text");
 
+            // target-hp: HP表示
             var hpLabel = new Label($"HP {target.CurrentHP}/{target.MaxHP}");
-            hpLabel.AddToClassList("target-entry-hp");
+            hpLabel.AddToClassList("target-hp");
 
-            visual.Add(bg);
-            visual.Add(nameLabel);
-            visual.Add(hpLabel);
-            entry.Add(visual);
+            slot.Add(bg);
+            slot.Add(nameLabel);
+            slot.Add(hpLabel);
 
             int idx = i;
-            entry.RegisterCallback<ClickEvent>(_ =>
+            slot.RegisterCallback<ClickEvent>(_ =>
             {
                 _selectedTargetIndex = idx;
                 UpdateTargetHighlight();
                 ConfirmTarget();
             });
 
-            _targetPanel.Add(entry);
+            _targetPanel.Add(slot);
         }
     }
 
@@ -479,11 +705,10 @@ public sealed class BattleUIController : MonoBehaviour
 
         for (int i = 0; i < _targetPanel.childCount; i++)
         {
-            var child = _targetPanel[i];
             if (i == _selectedTargetIndex)
-                child.AddToClassList("is-active");
+                _targetPanel[i].AddToClassList("is-active");
             else
-                child.RemoveFromClassList("is-active");
+                _targetPanel[i].RemoveFromClassList("is-active");
         }
     }
 
@@ -493,7 +718,7 @@ public sealed class BattleUIController : MonoBehaviour
         _targetPanel?.AddToClassList("hidden");
         _commandButtons?.RemoveFromClassList("hidden");
         UpdateCommandHighlight();
-        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Cancel  [\u2191\u2193] Select";
+        if (_cmdHint != null) _cmdHint.text = "[W]△ [D]○ [A]× [S]□  [X] Cancel";
     }
 
     // ════════════════════════════════════════════════
@@ -509,13 +734,20 @@ public sealed class BattleUIController : MonoBehaviour
 
         if (_mode == UIMode.CommandSelect)
         {
-            if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame)
-                NavigateCommand(-1);
-            else if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame)
-                NavigateCommand(+1);
+            // △○×□ ダイレクト選択
+            if (kb.wKey.wasPressedThisFrame)       // △ ARCHETYPE
+                SelectAndConfirmCommand(0);
+            else if (kb.dKey.wasPressedThisFrame)   // ○ WEAPON
+                SelectAndConfirmCommand(1);
+            else if (kb.aKey.wasPressedThisFrame)   // × SYNTHESIS
+                SelectAndConfirmCommand(2);
+            else if (kb.sKey.wasPressedThisFrame)   // □ ITEM
+                SelectAndConfirmCommand(3);
+            else if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)  // GUARD
+                SelectAndConfirmCommand(4);
 
-            if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
-                ConfirmCommand();
+            if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                HideCommandMenu();
         }
         else if (_mode == UIMode.TargetSelect)
         {
@@ -526,16 +758,16 @@ public sealed class BattleUIController : MonoBehaviour
 
             if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
                 ConfirmTarget();
-
             if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
                 ReturnToCommandMode();
         }
     }
 
-    private void NavigateCommand(int delta)
+    private void SelectAndConfirmCommand(int index)
     {
-        _selectedCommandIndex = (_selectedCommandIndex + delta + COMMAND_COUNT) % COMMAND_COUNT;
+        _selectedCommandIndex = index;
         UpdateCommandHighlight();
+        ConfirmCommand();
     }
 
     private void ConfirmCommand()
@@ -545,7 +777,7 @@ public sealed class BattleUIController : MonoBehaviour
         if (_cmdButtonElements[_selectedCommandIndex] != null &&
             _cmdButtonElements[_selectedCommandIndex].ClassListContains("is-disabled"))
         {
-            Debug.Log("[BattleUIController] このコマンドは使用不可です。");
+            Debug.Log("[DynamicBattleUI] このコマンドは使用不可です。");
             return;
         }
 
@@ -565,7 +797,7 @@ public sealed class BattleUIController : MonoBehaviour
         if (_targetList.Count == 0 || _selectedTargetIndex >= _targetList.Count) return;
 
         var target = _targetList[_selectedTargetIndex];
-        Debug.Log($"[BattleUIController] アクション実行: {_pendingAction} → {target.DisplayName}");
+        Debug.Log($"[DynamicBattleUI] アクション実行: {_pendingAction} → {target.DisplayName}");
 
         HideCommandMenu();
         _battleManager.ExecutePlayerAction(_pendingAction, target);
@@ -601,7 +833,6 @@ public sealed class BattleUIController : MonoBehaviour
                     _spPips[i].RemoveFromClassList("sp-pip-active");
             }
         }
-
         if (_spValue != null)
             _spValue.text = $"{current}/{max}";
     }
@@ -614,34 +845,31 @@ public sealed class BattleUIController : MonoBehaviour
     {
         for (int i = 0; i < MAX_AOG_ENTRIES; i++)
         {
-            var aogEntry = CreateAOGEntry();
-            aogEntry.Root.style.display = DisplayStyle.None;
-            _aogTrack.Add(aogEntry.Root);
-            _aogPool.Add(aogEntry);
+            var entry = CreateAOGEntry();
+            entry.Root.style.display = DisplayStyle.None;
+            _aogTrack.Add(entry.Root);
+            _aogPool.Add(entry);
         }
         _aogActiveCount = 0;
     }
 
     private AOGEntry CreateAOGEntry()
     {
-        var entry = new AOGEntry();
+        var entry = new AOGEntry
+        {
+            Root      = new VisualElement(),
+            GlowOuter = new VisualElement(),
+            Glow      = new VisualElement(),
+            Frame     = new VisualElement(),
+            Initial   = new Label("?")
+        };
 
-        entry.Root = new VisualElement();
         entry.Root.AddToClassList("aog-entry");
-
-        // 後光エフェクト（背面、アクティブ時のみ表示）
-        entry.GlowOuter = new VisualElement();
         entry.GlowOuter.AddToClassList("aog-glow-outer");
         entry.GlowOuter.style.display = DisplayStyle.None;
-
-        entry.Glow = new VisualElement();
         entry.Glow.AddToClassList("aog-glow");
         entry.Glow.style.display = DisplayStyle.None;
-
-        entry.Frame = new VisualElement();
         entry.Frame.AddToClassList("aog-entry-frame");
-
-        entry.Initial = new Label("?");
         entry.Initial.AddToClassList("aog-entry-initial");
 
         entry.Frame.Add(entry.Initial);
@@ -661,34 +889,31 @@ public sealed class BattleUIController : MonoBehaviour
 
         for (int i = 0; i < _aogPool.Count; i++)
         {
-            var poolEntry = _aogPool[i];
+            var pe = _aogPool[i];
 
             if (i < count)
             {
-                var character = order[i];
+                var ch = order[i];
                 bool isActive = (i == 0);
-                bool isPlayer = character.CharacterFaction == CharacterBattleController.Faction.Player;
+                bool isPlayer = ch.CharacterFaction == CharacterBattleController.Faction.Player;
 
-                // クラスリセット
-                poolEntry.Root.RemoveFromClassList("aog-entry-player");
-                poolEntry.Root.RemoveFromClassList("aog-entry-enemy");
-                poolEntry.Root.RemoveFromClassList("aog-active");
+                pe.Root.RemoveFromClassList("aog-entry-player");
+                pe.Root.RemoveFromClassList("aog-entry-enemy");
+                pe.Root.RemoveFromClassList("aog-active");
 
-                poolEntry.Root.AddToClassList(isPlayer ? "aog-entry-player" : "aog-entry-enemy");
-                if (isActive) poolEntry.Root.AddToClassList("aog-active");
+                pe.Root.AddToClassList(isPlayer ? "aog-entry-player" : "aog-entry-enemy");
+                if (isActive) pe.Root.AddToClassList("aog-active");
 
-                // 後光はアクティブ時のみ表示
-                poolEntry.Glow.style.display = isActive ? DisplayStyle.Flex : DisplayStyle.None;
-                poolEntry.GlowOuter.style.display = isActive ? DisplayStyle.Flex : DisplayStyle.None;
+                pe.Glow.style.display      = isActive ? DisplayStyle.Flex : DisplayStyle.None;
+                pe.GlowOuter.style.display  = isActive ? DisplayStyle.Flex : DisplayStyle.None;
 
-                string displayName = character.DisplayName ?? "?";
-                poolEntry.Initial.text = displayName.Length > 0 ? displayName.Substring(0, 1) : "?";
-
-                poolEntry.Root.style.display = DisplayStyle.Flex;
+                string dn = ch.DisplayName ?? "?";
+                pe.Initial.text = dn.Length > 0 ? dn.Substring(0, 1) : "?";
+                pe.Root.style.display = DisplayStyle.Flex;
             }
             else
             {
-                poolEntry.Root.style.display = DisplayStyle.None;
+                pe.Root.style.display = DisplayStyle.None;
             }
         }
 
@@ -708,10 +933,10 @@ public sealed class BattleUIController : MonoBehaviour
         var party = _battleManager.PlayerParty;
         if (party == null) return;
 
-        foreach (var character in party)
+        foreach (var ch in party)
         {
-            if (character == null) continue;
-            var card = CreatePartyCard(character);
+            if (ch == null) continue;
+            var card = CreatePartyCard(ch);
             _partyStatus.Add(card.Root);
             _partyCards.Add(card);
         }
@@ -721,82 +946,72 @@ public sealed class BattleUIController : MonoBehaviour
     {
         var card = new PartyCard
         {
-            Character = character,
-            LagPercent = 100f,
+            Character     = character,
+            LagPercent    = 100f,
             TargetPercent = 100f
         };
 
-        // 配置コンテナ（rotateなし）
         card.Root = new VisualElement();
         card.Root.AddToClassList("ps-card");
-
         if (_battleManager.ActiveCharacter == character)
             card.Root.AddToClassList("ps-active");
 
-        // ビジュアルラッパー（rotateはここ）
         var visual = new VisualElement();
         visual.AddToClassList("ps-card-visual");
 
         var inner = new VisualElement();
         inner.AddToClassList("ps-card-inner");
 
-        // ウォーターマーク（巨大薄文字、背面レイヤー）
-        var watermark = new Label(character.DisplayName?.ToUpper() ?? "");
-        watermark.AddToClassList("ps-watermark");
-        inner.Add(watermark);
+        var wm = new Label(character.DisplayName?.ToUpper() ?? "");
+        wm.AddToClassList("ps-watermark");
+        inner.Add(wm);
 
-        // ヘッダー
         var header = new VisualElement();
         header.AddToClassList("ps-card-header");
 
         card.NameLabel = new Label(character.DisplayName?.ToUpper() ?? "---");
         card.NameLabel.AddToClassList("ps-char-name");
-
         card.HPText = new Label($"{character.CurrentHP}/{character.MaxHP}");
         card.HPText.AddToClassList("ps-hp-text");
-
         header.Add(card.NameLabel);
         header.Add(card.HPText);
         inner.Add(header);
 
-        // HP バー
+        // HP Bar
         var hpBg = new VisualElement();
         hpBg.AddToClassList("ps-hp-bar-bg");
         hpBg.style.position = Position.Relative;
 
-        float hpPercent = character.MaxHP > 0 ? (float)character.CurrentHP / character.MaxHP * 100f : 0f;
-
+        float hpPct = character.MaxHP > 0 ? (float)character.CurrentHP / character.MaxHP * 100f : 0f;
         card.HPLag = new VisualElement();
         card.HPLag.AddToClassList("ps-hp-bar-lag");
-        card.HPLag.style.width = Length.Percent(hpPercent);
-        card.LagPercent = hpPercent;
-        card.TargetPercent = hpPercent;
+        card.HPLag.style.width = Length.Percent(hpPct);
+        card.LagPercent = hpPct;
+        card.TargetPercent = hpPct;
 
         card.HPFill = new VisualElement();
         card.HPFill.AddToClassList("ps-hp-bar-fill");
-        card.HPFill.style.width = Length.Percent(hpPercent);
+        card.HPFill.style.width = Length.Percent(hpPct);
 
         hpBg.Add(card.HPLag);
         hpBg.Add(card.HPFill);
         inner.Add(hpBg);
 
-        // EP バー
+        // EP Bar
         var epBg = new VisualElement();
         epBg.AddToClassList("ps-ep-bar-bg");
         epBg.style.position = Position.Relative;
 
         card.EPFill = new VisualElement();
         card.EPFill.AddToClassList("ps-ep-bar-fill");
-        float epPercent = character.MaxEP > 0 ? (float)character.CurrentEP / character.MaxEP * 100f : 0f;
-        card.EPFill.style.width = Length.Percent(epPercent);
-
+        float epPct = character.MaxEP > 0 ? (float)character.CurrentEP / character.MaxEP * 100f : 0f;
+        card.EPFill.style.width = Length.Percent(epPct);
         epBg.Add(card.EPFill);
         inner.Add(epBg);
 
         visual.Add(inner);
         card.Root.Add(visual);
 
-        // イベント（メソッド参照で保持→OnDestroyで解除可能）
         card.HPHandler = (hp, max) => UpdateCardHP(card, hp, max);
         card.EPHandler = (ep, max) => UpdateCardEP(card, ep, max);
         character.OnHPChanged += card.HPHandler;
@@ -808,17 +1023,17 @@ public sealed class BattleUIController : MonoBehaviour
 
     private void UpdateCardHP(PartyCard card, int hp, int max)
     {
-        float percent = max > 0 ? (float)hp / max * 100f : 0f;
-        card.TargetPercent = percent;
-        card.HPFill.style.width = Length.Percent(percent);
+        float pct = max > 0 ? (float)hp / max * 100f : 0f;
+        card.TargetPercent = pct;
+        card.HPFill.style.width = Length.Percent(pct);
         card.HPText.text = $"{hp}/{max}";
         UpdateCardState(card);
     }
 
     private void UpdateCardEP(PartyCard card, int ep, int max)
     {
-        float percent = max > 0 ? (float)ep / max * 100f : 0f;
-        card.EPFill.style.width = Length.Percent(percent);
+        float pct = max > 0 ? (float)ep / max * 100f : 0f;
+        card.EPFill.style.width = Length.Percent(pct);
     }
 
     private void UpdateCardState(PartyCard card)
@@ -833,10 +1048,8 @@ public sealed class BattleUIController : MonoBehaviour
         }
 
         card.Root.RemoveFromClassList("ps-dead");
-
         float ratio = card.Character.MaxHP > 0
-            ? (float)card.Character.CurrentHP / card.Character.MaxHP
-            : 1f;
+            ? (float)card.Character.CurrentHP / card.Character.MaxHP : 1f;
 
         if (ratio <= LOW_HP_THRESHOLD)
             card.Root.AddToClassList("ps-low-hp");
@@ -847,7 +1060,6 @@ public sealed class BattleUIController : MonoBehaviour
     private void UpdatePartyCardLag()
     {
         float dt = Time.unscaledDeltaTime;
-
         foreach (var card in _partyCards)
         {
             if (Mathf.Abs(card.LagPercent - card.TargetPercent) > 0.1f)

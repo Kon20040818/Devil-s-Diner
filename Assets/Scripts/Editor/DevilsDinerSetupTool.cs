@@ -549,7 +549,7 @@ public static class DevilsDinerSetupTool
         else
             Debug.LogWarning("[DevilsDiner] Assets/UI/BattlePanelSettings.asset が見つかりません。");
 
-        go.AddComponent<BattleUIController>();
+        go.AddComponent<DynamicBattleUIController>();
 
         // 旧uGUI UIを非アクティブ化
         foreach (var legacy in Object.FindObjectsByType<SkillCommandUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))

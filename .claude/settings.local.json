@@ -33,12 +33,21 @@
       "WebFetch(domain:landofgames.ru)",
       "WebFetch(domain:gameui.matme.info)",
       "WebFetch(domain:gamerch.com)",
-      "WebFetch(domain:gamers-high.com)"
+      "WebFetch(domain:gamers-high.com)",
+      "WebFetch(domain:www.gameuidatabase.com)",
+      "WebFetch(domain:personacentral.com)",
+      "Read(//c/Users/kirll/**)",
+      "Read(//c/Users/kirll/Devil''s Diner/Assets/Scripts/**)",
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \"import pathlib; p = pathlib.Path\\(r''c:/Users/kirll/Devil\\\\''s Diner/Assets/Scripts/UI/DynamicBattleUIController.cs''\\); t = p.read_text\\(encoding=''utf-8''\\); print\\(''count:'', t.count\\(''\\\\\\\\u2191''\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts",
       "c:\\Users\\kirll\\Devil''''s Diner\\Assets\\Scripts",
-      "c:\\Users\\kirll\\Devil''s Diner\\Assets"
+      "c:\\Users\\kirll\\Devil''s Diner\\Assets",
+      "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts\\UI",
+      "c:\\Users\\kirll\\Devil''''s Diner\\Assets\\Scripts\\UI",
+      "c:\\Users\\kirll\\Devil''s Diner"
     ]
   }
 }

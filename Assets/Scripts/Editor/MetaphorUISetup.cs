@@ -2,7 +2,7 @@
 // MetaphorUISetup.cs
 // メタファー風バトルUIの自動セットアップEditor拡張。
 // 旧uGUIコンポーネントを非破壊的に無効化し、
-// UIDocument + BattleUIController を持つGameObjectを構築する。
+// UIDocument + DynamicBattleUIController を持つGameObjectを構築する。
 // ============================================================
 #if UNITY_EDITOR
 using UnityEditor;
@@ -60,8 +60,8 @@ public static class MetaphorUISetup
             Debug.LogWarning($"[MetaphorUISetup] {PANEL_SETTINGS_PATH} が見つかりません。手動で設定してください。");
         }
 
-        // ── BattleUIController ──
-        go.AddComponent<BattleUIController>();
+        // ── DynamicBattleUIController ──
+        go.AddComponent<DynamicBattleUIController>();
 
         // ── 3. シーンをダーティにしてログ出力 ──
         EditorSceneManager.MarkSceneDirty(go.scene);
