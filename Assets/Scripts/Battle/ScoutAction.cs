@@ -59,6 +59,9 @@ public sealed class ScoutAction : MonoBehaviour
             chance = Mathf.Lerp(midChance, _minChance, t);
         }
 
+        // 食事バフによるスカウトボーナスを加算
+        chance = Mathf.Clamp01(chance + SkillEffectApplier.ScoutChanceBonus);
+
         float roll = UnityEngine.Random.Range(0f, 1f);
         bool success = roll <= chance;
 

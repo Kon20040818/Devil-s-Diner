@@ -172,6 +172,18 @@ public sealed class BattleManager : MonoBehaviour
     public List<string> RecruitedDemons { get; } = new List<string>();
 
     // ──────────────────────────────────────────────
+    // 食事選択（DishInstance 連携）
+    // ──────────────────────────────────────────────
+
+    private DishInstance? _selectedDish;
+
+    /// <summary>食事コマンドで使用する料理を事前に設定する。</summary>
+    public void SetSelectedDish(DishInstance dish) => _selectedDish = dish;
+
+    /// <summary>食事コマンドの料理選択をクリアする。</summary>
+    public void ClearSelectedDish() => _selectedDish = null;
+
+    // ──────────────────────────────────────────────
     // 公開 API — バトル開始
     // ──────────────────────────────────────────────
 
@@ -653,8 +665,27 @@ public sealed class BattleManager : MonoBehaviour
 
     private IEnumerator ExecuteMeal()
     {
-        if (_mealAction != null)
+        if (_selectedDish.HasValue && _mealAction != null)
         {
+            // ── 新パス: DishInstance 使用（回復＋カテゴリバフ） ──
+            DishInstance dish = _selectedDish.Value;
+
+            // インベントリから消費
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.Inventory.RemoveDish(dish);
+            }
+
+            yield return StartCoroutine(_mealAction.ExecuteActionCoroutine(_activeCharacter, dish, healAmount =>
+            {
+                Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} が {dish} で {healAmount} HP回復！");
+            }));
+
+            _selectedDish = null;
+        }
+        else if (_mealAction != null)
+        {
+            // ── 旧パス: 固定回復（DishInstance 未選択） ──
             yield return StartCoroutine(_mealAction.ExecuteActionCoroutine(_activeCharacter, healAmount =>
             {
                 Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} が食事で {healAmount} HP回復！");
@@ -662,7 +693,7 @@ public sealed class BattleManager : MonoBehaviour
         }
         else
         {
-            // MealAction 未アタッチ時のフォールバック: 固定50回復
+            // ── フォールバック: MealAction 未アタッチ ──
             int hpBefore = _activeCharacter.CurrentHP;
             _activeCharacter.Heal(50);
             int actualHeal = _activeCharacter.CurrentHP - hpBefore;

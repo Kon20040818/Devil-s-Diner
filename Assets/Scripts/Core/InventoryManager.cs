@@ -33,6 +33,9 @@ public sealed class InventoryManager : MonoBehaviour
     /// <summary>ItemData → 所持数。全アイテム共通。</summary>
     private readonly Dictionary<ItemData, int> _items = new Dictionary<ItemData, int>();
 
+    /// <summary>DishInstance → 所持数。品質別の料理専用ストア。</summary>
+    private readonly Dictionary<DishInstance, int> _dishes = new Dictionary<DishInstance, int>();
+
     // ──────────────────────────────────────────────
     // 公開 API — 汎用 CRUD
     // ──────────────────────────────────────────────
@@ -97,6 +100,60 @@ public sealed class InventoryManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
+    // 公開 API — 料理（DishInstance）専用 CRUD
+    // ──────────────────────────────────────────────
+
+    /// <summary>品質付き料理を追加する。</summary>
+    public void AddDish(DishInstance dish, int amount = 1)
+    {
+        if (dish.Data == null || amount <= 0) return;
+
+        if (_dishes.TryGetValue(dish, out int current))
+            _dishes[dish] = Mathf.Min(current + amount, MAX_STACK_SIZE);
+        else
+            _dishes[dish] = Mathf.Min(amount, MAX_STACK_SIZE);
+
+        OnInventoryChanged?.Invoke();
+    }
+
+    /// <summary>品質付き料理を除去する。不足時は false を返し何もしない。</summary>
+    public bool RemoveDish(DishInstance dish, int amount = 1)
+    {
+        if (dish.Data == null || amount <= 0) return false;
+
+        if (!_dishes.TryGetValue(dish, out int current) || current < amount)
+            return false;
+
+        int remaining = current - amount;
+        if (remaining <= 0)
+            _dishes.Remove(dish);
+        else
+            _dishes[dish] = remaining;
+
+        OnInventoryChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>指定料理インスタンスの所持数を返す。</summary>
+    public int GetDishCount(DishInstance dish)
+    {
+        if (dish.Data == null) return 0;
+        return _dishes.TryGetValue(dish, out int count) ? count : 0;
+    }
+
+    /// <summary>指定料理インスタンスを所持しているか。</summary>
+    public bool HasDish(DishInstance dish, int requiredAmount = 1)
+    {
+        return GetDishCount(dish) >= requiredAmount;
+    }
+
+    /// <summary>所持中の全料理インスタンスを返す（読み取り専用）。</summary>
+    public IReadOnlyDictionary<DishInstance, int> GetAllDishes() => _dishes;
+
+    /// <summary>料理インスタンスの総種類数を返す。</summary>
+    public int GetTotalDishCount() => _dishes.Count;
+
+    // ──────────────────────────────────────────────
     // 公開 API — 全クリア
     // ──────────────────────────────────────────────
 
@@ -104,6 +161,7 @@ public sealed class InventoryManager : MonoBehaviour
     public void ClearAll()
     {
         _items.Clear();
+        _dishes.Clear();
 #pragma warning disable CS0612, CS0618
         _legacyMaterials.Clear();
 #pragma warning restore CS0612, CS0618

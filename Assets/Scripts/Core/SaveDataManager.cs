@@ -36,6 +36,8 @@ public sealed class SaveDataManager : MonoBehaviour
         {
             public string ItemID;
             public int Amount;
+            /// <summary>料理の品質。料理以外は null。</summary>
+            public string Quality;
         }
 
         /// <summary>旧フォーマット互換用。</summary>
@@ -82,7 +84,7 @@ public sealed class SaveDataManager : MonoBehaviour
             Items      = new List<SaveData.ItemEntry>()
         };
 
-        // 全アイテムを ItemID ベースで保存
+        // 汎用アイテムを ItemID ベースで保存
         foreach (var kvp in gm.Inventory.GetAllItems())
         {
             if (kvp.Key == null || string.IsNullOrEmpty(kvp.Key.ItemID)) continue;
@@ -90,6 +92,18 @@ public sealed class SaveDataManager : MonoBehaviour
             {
                 ItemID = kvp.Key.ItemID,
                 Amount = kvp.Value
+            });
+        }
+
+        // 品質付き料理を保存
+        foreach (var kvp in gm.Inventory.GetAllDishes())
+        {
+            if (kvp.Key.Data == null || string.IsNullOrEmpty(kvp.Key.Data.ItemID)) continue;
+            saveData.Items.Add(new SaveData.ItemEntry
+            {
+                ItemID  = kvp.Key.Data.ItemID,
+                Amount  = kvp.Value,
+                Quality = kvp.Key.Quality.ToString()
             });
         }
 
@@ -149,13 +163,21 @@ public sealed class SaveDataManager : MonoBehaviour
         {
             foreach (var entry in saveData.Items)
             {
-                if (itemLookup.TryGetValue(entry.ItemID, out ItemData itemData))
+                if (!itemLookup.TryGetValue(entry.ItemID, out ItemData itemData))
                 {
-                    gm.Inventory.Add(itemData, entry.Amount);
+                    Debug.LogWarning($"[SaveDataManager] ItemID '{entry.ItemID}' に対応する ItemData が見つかりません。スキップします。");
+                    continue;
+                }
+
+                // Quality フィールドが存在 & DishData なら料理専用ストアへ
+                if (!string.IsNullOrEmpty(entry.Quality) && itemData is DishData dishData
+                    && System.Enum.TryParse<DishQuality>(entry.Quality, out var quality))
+                {
+                    gm.Inventory.AddDish(new DishInstance(dishData, quality), entry.Amount);
                 }
                 else
                 {
-                    Debug.LogWarning($"[SaveDataManager] ItemID '{entry.ItemID}' に対応する ItemData が見つかりません。スキップします。");
+                    gm.Inventory.Add(itemData, entry.Amount);
                 }
             }
         }
