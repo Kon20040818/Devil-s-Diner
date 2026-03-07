@@ -55,8 +55,11 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private const float HINT_OFFSET_X = -140f;
     private const float HINT_OFFSET_Y = 210f;
 
-    // ワールド→スクリーン変換でのキャラ高さ補正
-    private const float WORLD_Y_OFFSET = 0.6f;
+    // ワールド→スクリーン変換でのキャラ高さ補正 (0.0f = 中心)
+    private const float WORLD_Y_OFFSET = 0.0f;
+    
+    // UIの基準となるカメラ距離（近づいた時にUIを拡大する用）
+    private const float REFERENCE_DISTANCE = 8f;
 
     private static readonly CharacterBattleController.ActionType[] SLOT_TO_ACTION =
     {
@@ -440,6 +443,19 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         _currentPanelPos.y = Mathf.SmoothDamp(
             _currentPanelPos.y, target.y, ref _panelVelocity.y, SMOOTH_TIME, MAX_SPEED, dt);
 
+        // ── 距離ベースのスケール計算 ──
+        float distanceScale = 1f;
+        if (_battleManager != null && _battleManager.ActiveCharacter != null && Camera.main != null)
+        {
+            float dist = Vector3.Distance(Camera.main.transform.position, _battleManager.ActiveCharacter.transform.position);
+            
+            // 距離比率（カメラに近いほど大きくなる）
+            float rawScale = REFERENCE_DISTANCE / Mathf.Clamp(dist, 1f, 50f);
+            
+            // あまりにも巨大になりすぎるのを防ぐため、1.0倍～1.5倍の間に緩やかに収める
+            distanceScale = Mathf.Clamp(Mathf.Lerp(1.0f, rawScale, 0.35f), 0.7f, 1.4f);
+        }
+
         // ── Layer 1: RadialPivot ──
         // translate = SmoothDamp済みプレイヤー位置 + コマンドレイヤー視差
         if (_cmdRadialPivot != null)
@@ -452,10 +468,10 @@ public sealed class DynamicBattleUIController : MonoBehaviour
                 _currentPanelPos.y + cmdParallaxY
             );
 
-            // パースペクティブ偽装: rotate と scaleX を微調整
+            // パースペクティブ偽装: rotate と scaleX を微調整 + 距離スケール適用
             float finalRotate = PERSPECTIVE_BASE_ROTATE + _perspectiveRotate;
             _cmdRadialPivot.style.rotate = new Rotate(Angle.Degrees(finalRotate));
-            _cmdRadialPivot.style.scale = new Scale(new Vector3(_perspectiveScaleX, 1f, 1f));
+            _cmdRadialPivot.style.scale = new Scale(new Vector3(_perspectiveScaleX * distanceScale, distanceScale, 1f));
         }
 
         // ── 背景視差レイヤー ──
@@ -468,18 +484,20 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         if (_cmdInfoGroup != null)
         {
             _cmdInfoGroup.style.translate = new Translate(
-                _currentPanelPos.x + INFO_OFFSET_X,
-                _currentPanelPos.y + INFO_OFFSET_Y
+                _currentPanelPos.x + INFO_OFFSET_X * distanceScale,
+                _currentPanelPos.y + INFO_OFFSET_Y * distanceScale
             );
+            _cmdInfoGroup.style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
         }
 
         // ── ヒント ──
         if (_cmdHintWrap != null)
         {
             _cmdHintWrap.style.translate = new Translate(
-                _currentPanelPos.x + HINT_OFFSET_X,
-                _currentPanelPos.y + HINT_OFFSET_Y
+                _currentPanelPos.x + HINT_OFFSET_X * distanceScale,
+                _currentPanelPos.y + HINT_OFFSET_Y * distanceScale
             );
+            _cmdHintWrap.style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
         }
 
         // ── ターゲットパネル追従 ──
@@ -488,9 +506,10 @@ public sealed class DynamicBattleUIController : MonoBehaviour
             for (int i = 0; i < _targetPanel.childCount; i++)
             {
                 _targetPanel[i].style.translate = new Translate(
-                    _currentPanelPos.x - 130f,
-                    _currentPanelPos.y - 60f + i * 62f
+                    _currentPanelPos.x - 130f * distanceScale,
+                    _currentPanelPos.y + (-60f + i * 62f) * distanceScale
                 );
+                _targetPanel[i].style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
             }
         }
     }

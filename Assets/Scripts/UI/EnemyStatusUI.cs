@@ -188,9 +188,15 @@ public sealed class EnemyStatusUI : MonoBehaviour
         UpdateBrightEdge();
     }
 
+    // ----------------------------------------------------------------
+    // Configuration for constant visual size
+    // ----------------------------------------------------------------
+    private const float REFERENCE_DISTANCE = 10f; // The distance at which CANVAS_SCALE is exactly right
+
     private void LateUpdate()
     {
         FaceCameraBillboard();
+        MaintainScreenSize();
     }
 
     private void OnDestroy()
@@ -263,6 +269,33 @@ public sealed class EnemyStatusUI : MonoBehaviour
         {
             _canvasTransform.forward = _mainCamera.transform.forward;
         }
+    }
+
+    /// <summary>
+    /// Scales the canvas so it maintains the same apparent size on screen regardless of distance.
+    /// </summary>
+    private void MaintainScreenSize()
+    {
+        if (_canvasTransform == null || _mainCamera == null) return;
+
+        // Calculate distance from camera to the UI
+        float distance = Vector3.Distance(_mainCamera.transform.position, _canvasTransform.position);
+        
+        // At REFERENCE_DISTANCE, the scale is CANVAS_SCALE. 
+        // As distance changes, we scale proportionally to keep the same vertical screen space.
+        // We also account for the FOV.
+        float currentFov = _mainCamera.fieldOfView;
+        float fovFactor = Mathf.Tan(currentFov * 0.5f * Mathf.Deg2Rad);
+        
+        // Normalize against a standard FOV of 60 degrees to keep expected size stable
+        float referenceFovFactor = Mathf.Tan(60f * 0.5f * Mathf.Deg2Rad);
+        
+        // Prevent scaling down to zero or blowing up infinitely
+        distance = Mathf.Clamp(distance, 0.5f, 50f);
+        
+        float adjustedScale = CANVAS_SCALE * (distance / REFERENCE_DISTANCE) * (fovFactor / referenceFovFactor);
+        
+        _canvasTransform.localScale = Vector3.one * adjustedScale;
     }
 
     // ================================================================
