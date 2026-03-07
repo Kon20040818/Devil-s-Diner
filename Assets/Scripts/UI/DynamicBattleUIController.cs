@@ -65,7 +65,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     {
         CharacterBattleController.ActionType.Skill,        // ARCHETYPE
         CharacterBattleController.ActionType.BasicAttack,   // WEAPON
-        CharacterBattleController.ActionType.Skill,        // SYNTHESIS (placeholder)
+        CharacterBattleController.ActionType.Meal,         // MEAL
         CharacterBattleController.ActionType.BasicAttack,   // ITEM (placeholder)
         CharacterBattleController.ActionType.BasicAttack,   // GUARD (placeholder)
     };
@@ -813,6 +813,20 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         }
 
         _pendingAction = SLOT_TO_ACTION[_selectedCommandIndex];
+
+        // Meal は自身が対象 → ターゲット選択をスキップして即実行
+        if (_pendingAction == CharacterBattleController.ActionType.Meal)
+        {
+            var self = _battleManager.ActiveCharacter;
+            if (self != null)
+            {
+                Debug.Log($"[DynamicBattleUI] Meal → {self.DisplayName} (自身)");
+                HideCommandMenu();
+                _battleManager.ExecutePlayerAction(_pendingAction, self);
+            }
+            return;
+        }
+
         EnterTargetSelection();
     }
 

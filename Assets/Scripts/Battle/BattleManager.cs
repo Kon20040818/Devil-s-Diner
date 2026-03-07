@@ -147,6 +147,17 @@ public sealed class BattleManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
+    // MealAction（食事）参照
+    // ──────────────────────────────────────────────
+
+    private MealAction _mealAction;
+
+    public void SetMealAction(MealAction mealAction)
+    {
+        _mealAction = mealAction;
+    }
+
+    // ──────────────────────────────────────────────
     // 公開 API — バトル開始
     // ──────────────────────────────────────────────
 
@@ -329,6 +340,18 @@ public sealed class BattleManager : MonoBehaviour
     {
         SetPhase(BattlePhase.Executing);
         _activeCharacter.SetState(CharacterBattleController.BattleState.Executing);
+
+        // ── Meal: 自身回復 → ターン消費して即終了 ──
+        if (_selectedAction == CharacterBattleController.ActionType.Meal)
+        {
+            // カメラ: 自身にフォーカス
+            if (_cameraManager != null)
+                _cameraManager.FocusOnCharacter(_activeCharacter.transform);
+
+            yield return StartCoroutine(ExecuteMeal());
+            yield return StartCoroutine(TurnEnd());
+            yield break;
+        }
 
         // アクション種別に応じたカメラ切替
         if (_cameraManager != null)
@@ -598,6 +621,30 @@ public sealed class BattleManager : MonoBehaviour
         }));
 
         Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} 敵攻撃合計 → {totalDealt} ダメージ（ジャストガード付き）");
+    }
+
+    // ──────────────────────────────────────────────
+    // 食事処理（HP回復・ターン消費）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteMeal()
+    {
+        if (_mealAction != null)
+        {
+            yield return StartCoroutine(_mealAction.ExecuteActionCoroutine(_activeCharacter, healAmount =>
+            {
+                Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} が食事で {healAmount} HP回復！");
+            }));
+        }
+        else
+        {
+            // MealAction 未アタッチ時のフォールバック: 固定50回復
+            int hpBefore = _activeCharacter.CurrentHP;
+            _activeCharacter.Heal(50);
+            int actualHeal = _activeCharacter.CurrentHP - hpBefore;
+            Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} は手作り弁当を食べた！ HPが{actualHeal}回復した！ (HP: {_activeCharacter.CurrentHP}/{_activeCharacter.MaxHP})");
+            yield return new WaitForSeconds(0.5f);
+        }
     }
 
     private IEnumerator TurnEnd()

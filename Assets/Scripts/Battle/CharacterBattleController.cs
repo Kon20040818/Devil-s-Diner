@@ -50,7 +50,8 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         BasicAttack,
         Skill,
-        Ultimate
+        Ultimate,
+        Meal
     }
 
     /// <summary>ダメージ結果を格納する構造体。UI表示に使用。</summary>
