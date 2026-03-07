@@ -65,6 +65,48 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
             Debug.LogError("[BattleSceneBootstrap] 味方キャラクターが見つかりません。");
             return;
         }
+        // ── PendingBattleData からの動的敵生成 ──
+        if (enemyList.Count == 0 && GameManager.Instance != null && GameManager.Instance.PendingBattleData != null)
+        {
+            var battleData = GameManager.Instance.PendingBattleData;
+            if (battleData.EnemyStatsList != null)
+            {
+                for (int i = 0; i < battleData.EnemyStatsList.Length; i++)
+                {
+                    var stats = battleData.EnemyStatsList[i];
+                    if (stats == null) continue;
+
+                    // 赤カプセルで敵プリミティブを生成
+                    var enemyGO = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                    enemyGO.name = $"Enemy_{stats.DisplayName}_{i}";
+                    enemyGO.transform.position = new Vector3(4f + i * 2f, 1f, 0f);
+                    enemyGO.transform.rotation = Quaternion.LookRotation(Vector3.left);
+
+                    var renderer = enemyGO.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        var shader = Shader.Find("Universal Render Pipeline/Lit");
+                        if (shader == null) shader = Shader.Find("Standard");
+                        var mat = new Material(shader);
+                        mat.color = new Color(1f, 0.3f, 0.3f);
+                        renderer.material = mat;
+                    }
+
+                    var ctrl = enemyGO.AddComponent<CharacterBattleController>();
+                    ctrl.Initialize(stats, CharacterBattleController.Faction.Enemy);
+
+                    // EnemyData を結線
+                    if (battleData.EnemyDataList != null && i < battleData.EnemyDataList.Length && battleData.EnemyDataList[i] != null)
+                    {
+                        ctrl.SetEnemyData(battleData.EnemyDataList[i]);
+                    }
+
+                    enemyList.Add(ctrl);
+                    Debug.Log($"[BattleSceneBootstrap] PendingBattleData から敵を動的生成: {stats.DisplayName}");
+                }
+            }
+        }
+
         if (enemyList.Count == 0)
         {
             Debug.LogError("[BattleSceneBootstrap] 敵キャラクターが見つかりません。");
@@ -172,6 +214,18 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
         // ── BattleResultController（リザルト画面＋シーン遷移）自動生成・結線 ──
         BattleResultController resultController = gameObject.AddComponent<BattleResultController>();
         resultController.Initialize(battleManager);
+
+        // PendingBattleData の ReturnSceneName を BattleResultController に設定
+        if (GameManager.Instance != null && GameManager.Instance.PendingBattleData != null)
+        {
+            string returnScene = GameManager.Instance.PendingBattleData.ReturnSceneName;
+            if (!string.IsNullOrEmpty(returnScene))
+            {
+                resultController.SetReturnSceneName(returnScene);
+            }
+            GameManager.Instance.ClearBattleTransitionData();
+        }
+
         Debug.Log("[BattleSceneBootstrap] BattleResultController を自動生成しました。");
     }
 }

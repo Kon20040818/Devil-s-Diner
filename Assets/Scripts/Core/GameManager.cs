@@ -22,7 +22,7 @@ public sealed class GameManager : MonoBehaviour
     // 定数
     // ──────────────────────────────────────────────
     private const string BOOT_SCENE    = "BootScene";
-    private const string ACTION_SCENE  = "ActionScene";
+    private const string FIELD_SCENE   = "FieldScene";
     private const float  DEFAULT_FIXED_DELTA_TIME = 0.02f; // 50 Hz
     private const int    STARTING_GOLD = 500;
     private const int    STARTING_DAY  = 1;
@@ -81,6 +81,16 @@ public sealed class GameManager : MonoBehaviour
 
     /// <summary>セーブデータ復元用。外部から所持金を設定する。</summary>
     public void SetGold(int gold) { Gold = gold; OnGoldChanged?.Invoke(Gold); }
+
+    // ──────────────────────────────────────────────
+    // バトル遷移データ
+    // ──────────────────────────────────────────────
+
+    /// <summary>フィールド→バトル遷移時の敵構成データ。BattleSceneBootstrap が消費する。</summary>
+    public BattleTransitionData PendingBattleData { get; set; }
+
+    /// <summary>PendingBattleData をクリアする。</summary>
+    public void ClearBattleTransitionData() => PendingBattleData = null;
 
     // ──────────────────────────────────────────────
     // 内部状態
@@ -163,7 +173,8 @@ public sealed class GameManager : MonoBehaviour
     private void LateUpdate()
     {
         if (!_isTransitioning
-            && CurrentSceneName != ACTION_SCENE
+            && CurrentSceneName != FIELD_SCENE
+            && CurrentSceneName != "BattleScene"
             && !Mathf.Approximately(Time.timeScale, 1f))
         {
             Debug.LogWarning(
@@ -189,7 +200,7 @@ public sealed class GameManager : MonoBehaviour
         {
             case GamePhase.Morning:
                 SetPhase(GamePhase.Noon);
-                LoadSceneAsync(ACTION_SCENE);
+                LoadSceneAsync(FIELD_SCENE);
                 break;
 
             case GamePhase.Noon:

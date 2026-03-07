@@ -26,7 +26,7 @@ public sealed class BattleResultController : MonoBehaviour
 
     [Header("シーン遷移")]
     [Tooltip("バトル後に遷移するシーン名")]
-    [SerializeField] private string _returnSceneName = "ActionScene";
+    [SerializeField] private string _returnSceneName = "FieldScene";
 
     // ──────────────────────────────────────────────
     // 参照
@@ -48,6 +48,9 @@ public sealed class BattleResultController : MonoBehaviour
         _resultUI = FindFirstObjectByType<BattleResultUI>();
         _effectsUI = FindFirstObjectByType<BattleEffectsUI>();
     }
+
+    /// <summary>バトル後の遷移先シーン名を設定する。</summary>
+    public void SetReturnSceneName(string sceneName) => _returnSceneName = sceneName;
 
     private void OnDestroy()
     {
