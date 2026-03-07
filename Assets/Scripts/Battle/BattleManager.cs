@@ -333,20 +333,32 @@ public sealed class BattleManager : MonoBehaviour
         // アクション種別に応じたカメラ切替
         if (_cameraManager != null)
         {
-            switch (_selectedAction)
+            // 敵のターンの場合は、すでにSwitchToEnemyCameraで防衛視点になっているため
+            // 基本的にはそのままの視点を維持する（敵の肩越しアクションカメラには絶対切り替えない）
+            if (_activeCharacter.CharacterFaction == CharacterBattleController.Faction.Enemy)
             {
-                case CharacterBattleController.ActionType.Skill:
-                    _cameraManager.SwitchToSkillCamera(
-                        _activeCharacter.transform,
-                        _selectedTarget.transform);
-                    // スキル名表示イベント
+                if (_selectedAction == CharacterBattleController.ActionType.Skill)
+                {
                     OnSkillExecuted?.Invoke(_activeCharacter, "スキル");
-                    break;
-                default:
-                    _cameraManager.SwitchToActionCamera(
-                        _activeCharacter.transform,
-                        _selectedTarget.transform);
-                    break;
+                }
+            }
+            else
+            {
+                // 味方のターンの場合は、アクションカメラに切り替える
+                switch (_selectedAction)
+                {
+                    case CharacterBattleController.ActionType.Skill:
+                        _cameraManager.SwitchToSkillCamera(
+                            _activeCharacter.transform,
+                            _selectedTarget.transform);
+                        OnSkillExecuted?.Invoke(_activeCharacter, "スキル");
+                        break;
+                    default:
+                        _cameraManager.SwitchToActionCamera(
+                            _activeCharacter.transform,
+                            _selectedTarget.transform);
+                        break;
+                }
             }
         }
 
