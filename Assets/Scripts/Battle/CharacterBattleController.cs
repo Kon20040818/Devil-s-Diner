@@ -75,6 +75,7 @@ public sealed class CharacterBattleController : MonoBehaviour
     private int _currentToughness;
     private bool _isBroken;
     private bool _isScouted;
+    private EnemyData _enemyData;
 
     // ──────────────────────────────────────────────
     // プロパティ
@@ -124,6 +125,12 @@ public sealed class CharacterBattleController : MonoBehaviour
 
     /// <summary>スカウトによって雇用されたか。</summary>
     public bool IsScouted => _isScouted;
+
+    /// <summary>敵データ（ドロップ・ゴールド報酬用）。敵のみセット。</summary>
+    public EnemyData EnemyData => _enemyData;
+
+    /// <summary>敵データをセットする。BattleSceneBootstrapで呼ばれる。</summary>
+    public void SetEnemyData(EnemyData data) => _enemyData = data;
 
     // ──────────────────────────────────────────────
     // イベント

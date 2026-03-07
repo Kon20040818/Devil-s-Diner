@@ -16,6 +16,15 @@ public sealed class CharacterStats : ScriptableObject
     // 属性タイプ
     // ──────────────────────────────────────────────
 
+    /// <summary>スキルの対象範囲。</summary>
+    public enum TargetingMode
+    {
+        /// <summary>単体攻撃。</summary>
+        Single,
+        /// <summary>全敵対象の範囲攻撃。</summary>
+        AllEnemies
+    }
+
     /// <summary>属性。弱点・耐性の計算に使用。</summary>
     public enum ElementType
     {
@@ -79,6 +88,10 @@ public sealed class CharacterStats : ScriptableObject
     [Tooltip("必殺技のダメージ倍率 (通常攻撃比)")]
     [SerializeField] private float _ultimateMultiplier = 3.0f;
 
+    [Header("スキル対象")]
+    [Tooltip("スキルの対象範囲。AllEnemies で全体攻撃")]
+    [SerializeField] private TargetingMode _skillTargetMode = TargetingMode.Single;
+
     [Header("靭性(タフネス)")]
     [Tooltip("靭性の最大値。0で靭性システム無効（主に敵用）")]
     [SerializeField] private int _maxToughness;
@@ -111,6 +124,7 @@ public sealed class CharacterStats : ScriptableObject
     public int EPGainOnSkill => _epGainOnSkill;
     public float SkillMultiplier => _skillMultiplier;
     public float UltimateMultiplier => _ultimateMultiplier;
+    public TargetingMode SkillTargetMode => _skillTargetMode;
 
     public int MaxToughness => _maxToughness;
     public ElementType[] WeakElements => _weakElements;

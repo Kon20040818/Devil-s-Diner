@@ -11,6 +11,48 @@ using UnityEngine;
 /// </summary>
 public static class DropResolver
 {
+    /// <summary>ドロップ判定の結果。</summary>
+    public struct DropResult
+    {
+        public ItemData DroppedItem;
+        public bool Success;
+    }
+
+    /// <summary>
+    /// ドロップ判定を行い、結果を返す（インベントリには追加しない）。
+    /// </summary>
+    public static DropResult ResolveDropWithResult(EnemyData enemyData, bool isCritical)
+    {
+        var result = new DropResult { DroppedItem = null, Success = false };
+        if (enemyData == null) return result;
+
+        ItemData dropItem;
+        float dropRate;
+
+        if (isCritical && enemyData.DropItemJust != null)
+        {
+            dropItem = enemyData.DropItemJust;
+            dropRate = enemyData.DropRateJust;
+        }
+        else
+        {
+            dropItem = enemyData.DropItemNormal;
+            dropRate = enemyData.DropRateNormal;
+        }
+
+        if (dropItem == null) return result;
+
+        float effectiveDropRate = Mathf.Clamp01(dropRate + SkillEffectApplier.DropRateBonus);
+
+        if (Random.value <= effectiveDropRate)
+        {
+            result.DroppedItem = dropItem;
+            result.Success = true;
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// ドロップ判定を行い、成功時はインベントリに追加する。
     /// </summary>

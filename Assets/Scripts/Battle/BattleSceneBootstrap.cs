@@ -3,6 +3,7 @@
 // BattleScene のブートストラップ。シーンロード時に各コンポーネント間の
 // 参照を自動結線し、バトルを開始する。
 // ============================================================
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -127,6 +128,29 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
         battleManager.SetBuffDurationTracker(buffTracker);
         Debug.Log("[BattleSceneBootstrap] BuffDurationTracker を自動生成しました。");
 
+        // ── EnemyAIController（敵AI）自動生成・結線 ──
+        EnemyAIController enemyAI = gameObject.AddComponent<EnemyAIController>();
+        battleManager.SetEnemyAIController(enemyAI);
+        Debug.Log("[BattleSceneBootstrap] EnemyAIController を自動生成しました。");
+
+        // ── 敵キャラに EnemyData を結線（ドロップ・ゴールド報酬用） ──
+        EnemyData[] allEnemyData = Resources.LoadAll<EnemyData>("");
+        var enemyDataLookup = new Dictionary<string, EnemyData>();
+        foreach (var ed in allEnemyData)
+        {
+            if (ed != null && !string.IsNullOrEmpty(ed.Id))
+                enemyDataLookup[ed.Id] = ed;
+        }
+
+        foreach (var enemy in enemyList)
+        {
+            if (enemy.Stats != null && enemyDataLookup.TryGetValue(enemy.Stats.Id, out var eData))
+            {
+                enemy.SetEnemyData(eData);
+                Debug.Log($"[BattleSceneBootstrap] {enemy.DisplayName} に EnemyData '{eData.Id}' を結線。");
+            }
+        }
+
         // ── バトル開始（パーティ配列をセットし、キューを構築する） ──
         battleManager.StartBattle(playerList.ToArray(), enemyList.ToArray());
 
@@ -144,5 +168,10 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
             dynamicUI.Initialize(battleManager);
             Debug.Log("[BattleSceneBootstrap] DynamicBattleUIController を初期化しました。");
         }
+
+        // ── BattleResultController（リザルト画面＋シーン遷移）自動生成・結線 ──
+        BattleResultController resultController = gameObject.AddComponent<BattleResultController>();
+        resultController.Initialize(battleManager);
+        Debug.Log("[BattleSceneBootstrap] BattleResultController を自動生成しました。");
     }
 }

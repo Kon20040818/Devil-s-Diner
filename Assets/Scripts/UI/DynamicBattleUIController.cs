@@ -109,6 +109,11 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private readonly List<int> _mealQuantities = new List<int>();
     private int _selectedMealIndex;
 
+    // バフインジケーター
+    private VisualElement _buffContainer;
+    private readonly Dictionary<DishCategory, VisualElement> _buffIcons
+        = new Dictionary<DishCategory, VisualElement>();
+
     // SmoothDamp 状態
     private Vector2 _currentPanelPos;
     private Vector2 _panelVelocity;
@@ -241,6 +246,13 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
             if (_battleManager.Queue != null)
                 _battleManager.Queue.OnQueueUpdated -= HandleQueueUpdated;
+
+            var tracker = _battleManager.BuffDurationTracker;
+            if (tracker != null)
+            {
+                tracker.OnBuffApplied -= HandleBuffApplied;
+                tracker.OnBuffExpired -= HandleBuffExpired;
+            }
         }
 
         foreach (var card in _partyCards)
@@ -345,6 +357,23 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         _mealPanel.AddToClassList("target-panel");
         _mealPanel.AddToClassList("hidden");
         _commandMenu.Add(_mealPanel);
+
+        // バフインジケーターコンテナ
+        _buffContainer = new VisualElement();
+        _buffContainer.AddToClassList("buff-container");
+        _root.Add(_buffContainer);
+
+        // BuffDurationTracker イベント購読
+        var tracker = _battleManager.BuffDurationTracker;
+        if (tracker != null)
+        {
+            tracker.OnBuffApplied += HandleBuffApplied;
+            tracker.OnBuffExpired += HandleBuffExpired;
+
+            // 既存バフの初期表示
+            foreach (var kvp in tracker.GetActiveBuffs())
+                HandleBuffApplied(kvp.Key, kvp.Value.RemainingTurns);
+        }
 
         BuildSPPips();
         HandleSPChanged(_battleManager.CurrentSP, _battleManager.MaxSP);
@@ -866,6 +895,17 @@ public sealed class DynamicBattleUIController : MonoBehaviour
             return;
         }
 
+        // AoE スキル → ターゲット選択をスキップして即実行
+        if (_pendingAction == CharacterBattleController.ActionType.Skill
+            && _battleManager.ActiveCharacter != null
+            && _battleManager.ActiveCharacter.Stats != null
+            && _battleManager.ActiveCharacter.Stats.SkillTargetMode == CharacterStats.TargetingMode.AllEnemies)
+        {
+            _battleManager.ExecutePlayerAction(CharacterBattleController.ActionType.Skill, null);
+            HideCommandMenu();
+            return;
+        }
+
         EnterTargetSelection();
     }
 
@@ -956,10 +996,10 @@ public sealed class DynamicBattleUIController : MonoBehaviour
             // 品質バッジ + 料理名
             string qualityBadge = dish.Quality switch
             {
+                DishQuality.Poor     => "[失敗] ",
                 DishQuality.Normal   => "",
-                DishQuality.Fine     => "[Fine] ",
-                DishQuality.Premium  => "[Premium] ",
-                DishQuality.Masterwork => "[Master] ",
+                DishQuality.Fine     => "[上出来] ",
+                DishQuality.Exquisite => "[極上] ",
                 _ => ""
             };
 
@@ -1034,6 +1074,73 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     {
         _mealPanel?.AddToClassList("hidden");
         ReturnToCommandMode();
+    }
+
+    // ════════════════════════════════════════════════
+    // バフインジケーター
+    // ════════════════════════════════════════════════
+
+    private void HandleBuffApplied(DishCategory category, int remainingTurns)
+    {
+        if (_buffContainer == null) return;
+
+        if (_buffIcons.TryGetValue(category, out var existing))
+        {
+            // 残ターン数を更新
+            var turnsLabel = existing.Q<Label>("buff-turns-label");
+            if (turnsLabel != null) turnsLabel.text = $"{remainingTurns}T";
+            return;
+        }
+
+        // 新規アイコン生成
+        var icon = new VisualElement();
+        icon.AddToClassList("buff-icon");
+        icon.AddToClassList(GetBuffIconClass(category));
+
+        var label = new Label(GetBuffCategoryLabel(category));
+        label.AddToClassList("buff-label");
+
+        var turns = new Label($"{remainingTurns}T");
+        turns.AddToClassList("buff-turns");
+        turns.name = "buff-turns-label";
+
+        icon.Add(label);
+        icon.Add(turns);
+
+        _buffContainer.Add(icon);
+        _buffIcons[category] = icon;
+    }
+
+    private void HandleBuffExpired(DishCategory category)
+    {
+        if (!_buffIcons.TryGetValue(category, out var icon)) return;
+
+        icon.RemoveFromHierarchy();
+        _buffIcons.Remove(category);
+    }
+
+    private static string GetBuffCategoryLabel(DishCategory category)
+    {
+        return category switch
+        {
+            DishCategory.Meat    => "ATK",
+            DishCategory.Fish    => "SPD",
+            DishCategory.Salad   => "DEF",
+            DishCategory.Dessert => "RGN",
+            _ => "???"
+        };
+    }
+
+    private static string GetBuffIconClass(DishCategory category)
+    {
+        return category switch
+        {
+            DishCategory.Meat    => "buff-icon-atk",
+            DishCategory.Fish    => "buff-icon-spd",
+            DishCategory.Salad   => "buff-icon-def",
+            DishCategory.Dessert => "buff-icon-rgn",
+            _ => "buff-icon-atk"
+        };
     }
 
     // ════════════════════════════════════════════════

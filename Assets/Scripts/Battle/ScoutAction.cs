@@ -67,8 +67,9 @@ public sealed class ScoutAction : MonoBehaviour
 
         Debug.Log($"[ScoutAction] {target.DisplayName} をスカウト！ HP: {target.CurrentHP}/{target.MaxHP} ({hpRatio:P0}) 成功確率: {chance:P0} 判定: {roll:F3} → {(success ? "成功！" : "失敗...")}");
 
-        // TODO: スカウト演出エフェクト再生
-        // TODO: SE再生
+        // スカウト演出エフェクト
+        var effectsUI = FindFirstObjectByType<BattleEffectsUI>();
+        if (effectsUI != null) yield return effectsUI.PlayScoutFlash();
 
         if (success)
         {

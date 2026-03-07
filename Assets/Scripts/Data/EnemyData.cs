@@ -19,6 +19,9 @@ public sealed class EnemyData : ScriptableObject
     [SerializeField, Range(0f, 1f)] private float _dropRateNormal = 0.8f;
     [SerializeField, Range(0f, 1f)] private float _dropRateJust = 1.0f;
 
+    [Header("ゴールド報酬")]
+    [SerializeField] private int _goldReward = 100;
+
     public string   Id              => _id;
     public string   EnemyName       => _enemyName;
     public int      MaxHP           => _maxHP;
@@ -27,4 +30,5 @@ public sealed class EnemyData : ScriptableObject
     public ItemData DropItemJust    => _dropItemJust;
     public float    DropRateNormal  => _dropRateNormal;
     public float    DropRateJust    => _dropRateJust;
+    public int      GoldReward      => _goldReward;
 }

@@ -598,3 +598,40 @@
 .ps-low-hp .ps-hp-bar-fill { background-color: rgb(255, 70, 20); }
 .ps-dead { opacity: 0.12; }
 .ps-dead .ps-hp-bar-fill { background-color: rgb(35, 35, 35); }
+
+/* ── バフインジケーター ── */
+.buff-container {
+    position: absolute;
+    right: 8px;
+    bottom: 142px;
+    flex-direction: row;
+    align-items: center;
+}
+.buff-icon {
+    width: 56px;
+    height: 28px;
+    background-color: rgba(0, 0, 0, 0.85);
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    margin-left: 4px;
+    padding: 2px 6px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    transition-property: opacity, scale;
+    transition-duration: 0.2s;
+}
+.buff-icon-atk { border-top-color: rgb(230, 0, 18); border-bottom-color: rgb(230, 0, 18); }
+.buff-icon-spd { border-top-color: rgb(0, 200, 255); border-bottom-color: rgb(0, 200, 255); }
+.buff-icon-def { border-top-color: rgb(0, 200, 80); border-bottom-color: rgb(0, 200, 80); }
+.buff-icon-rgn { border-top-color: rgb(255, 200, 0); border-bottom-color: rgb(255, 200, 0); }
+.buff-label {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+}
+.buff-turns {
+    font-size: 12px;
+    color: rgba(200, 200, 215, 0.85);
+    margin-left: 4px;
+}

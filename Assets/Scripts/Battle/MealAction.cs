@@ -47,8 +47,9 @@ public sealed class MealAction : MonoBehaviour
 
         Debug.Log($"[MealAction] {target.DisplayName} は手作り弁当を食べた！ HPが{actualHeal}回復した！ (HP: {target.CurrentHP}/{target.MaxHP})");
 
-        // TODO: 回復エフェクト再生
-        // TODO: SE再生
+        // 回復エフェクト
+        var effectsUI = FindFirstObjectByType<BattleEffectsUI>();
+        if (effectsUI != null) yield return effectsUI.PlayHealFlash();
 
         yield return new WaitForSeconds(_animDuration);
 
@@ -87,8 +88,9 @@ public sealed class MealAction : MonoBehaviour
             _buffApplier.ApplyBuff(dish);
         }
 
-        // TODO: 回復エフェクト再生
-        // TODO: SE再生
+        // 回復エフェクト
+        var effectsUI = FindFirstObjectByType<BattleEffectsUI>();
+        if (effectsUI != null) yield return effectsUI.PlayHealFlash();
 
         yield return new WaitForSeconds(_animDuration);
 

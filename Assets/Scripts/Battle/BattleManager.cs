@@ -182,6 +182,20 @@ public sealed class BattleManager : MonoBehaviour
         _buffDurationTracker = tracker;
     }
 
+    /// <summary>バフ持続トラッカーへの参照（UI用）。</summary>
+    public BuffDurationTracker BuffDurationTracker => _buffDurationTracker;
+
+    // ──────────────────────────────────────────────
+    // EnemyAIController（敵AI）参照
+    // ──────────────────────────────────────────────
+
+    private EnemyAIController _enemyAIController;
+
+    public void SetEnemyAIController(EnemyAIController ai)
+    {
+        _enemyAIController = ai;
+    }
+
     // ──────────────────────────────────────────────
     // 食事選択（DishInstance 連携）
     // ──────────────────────────────────────────────
@@ -245,7 +259,13 @@ public sealed class BattleManager : MonoBehaviour
         CharacterBattleController target)
     {
         if (CurrentPhase != BattlePhase.PlayerCommand) return;
-        if (target == null || !target.IsAlive) return;
+
+        // AoE スキルは target null を許容する
+        bool isAoE = actionType == CharacterBattleController.ActionType.Skill
+            && _activeCharacter.Stats != null
+            && _activeCharacter.Stats.SkillTargetMode == CharacterStats.TargetingMode.AllEnemies;
+
+        if (!isAoE && (target == null || !target.IsAlive)) return;
 
         // SP/EP バリデーション
         switch (actionType)
@@ -357,9 +377,19 @@ public sealed class BattleManager : MonoBehaviour
     {
         _activeCharacter.SetState(CharacterBattleController.BattleState.Executing);
 
-        // 敵ターンのワイドカメラ
-        _selectedTarget = _activeCharacter.ChooseTarget(_playerParty);
-        _selectedAction = CharacterBattleController.ActionType.BasicAttack;
+        // 敵AI で行動・ターゲットを決定
+        if (_enemyAIController != null)
+        {
+            var decision = _enemyAIController.Decide(_activeCharacter, _playerParty);
+            _selectedAction = decision.Action;
+            _selectedTarget = decision.Target;
+        }
+        else
+        {
+            // フォールバック: ランダムターゲット＋通常攻撃
+            _selectedTarget = _activeCharacter.ChooseTarget(_playerParty);
+            _selectedAction = CharacterBattleController.ActionType.BasicAttack;
+        }
 
         if (_selectedTarget == null)
         {
@@ -418,15 +448,26 @@ public sealed class BattleManager : MonoBehaviour
                 switch (_selectedAction)
                 {
                     case CharacterBattleController.ActionType.Skill:
-                        _cameraManager.SwitchToSkillCamera(
-                            _activeCharacter.transform,
-                            _selectedTarget.transform);
+                        if (_selectedTarget != null)
+                        {
+                            _cameraManager.SwitchToSkillCamera(
+                                _activeCharacter.transform,
+                                _selectedTarget.transform);
+                        }
+                        else
+                        {
+                            // AoE: ターゲットなし → オーバービュー維持
+                            _cameraManager.SwitchToOverview();
+                        }
                         OnSkillExecuted?.Invoke(_activeCharacter, "スキル");
                         break;
                     default:
-                        _cameraManager.SwitchToActionCamera(
-                            _activeCharacter.transform,
-                            _selectedTarget.transform);
+                        if (_selectedTarget != null)
+                        {
+                            _cameraManager.SwitchToActionCamera(
+                                _activeCharacter.transform,
+                                _selectedTarget.transform);
+                        }
                         break;
                 }
             }
@@ -447,27 +488,39 @@ public sealed class BattleManager : MonoBehaviour
                 break;
         }
 
-        // ── 味方通常攻撃 + AttackAction 存在時：ジャストアタック分岐 ──
-        bool useJustAttack = _selectedAction == CharacterBattleController.ActionType.BasicAttack
-            && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Player
-            && _attackAction != null;
+        // ── AoE スキル分岐 ──
+        bool useAoE = _selectedAction == CharacterBattleController.ActionType.Skill
+            && _activeCharacter.Stats != null
+            && _activeCharacter.Stats.SkillTargetMode == CharacterStats.TargetingMode.AllEnemies;
 
-        // ── 敵通常攻撃 + EnemyAttackAction 存在時：ジャストガード分岐 ──
-        bool useJustGuard = _selectedAction == CharacterBattleController.ActionType.BasicAttack
-            && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Enemy
-            && _enemyAttackAction != null;
-
-        if (useJustAttack)
+        if (useAoE)
         {
-            yield return StartCoroutine(ExecuteJustAttack());
-        }
-        else if (useJustGuard)
-        {
-            yield return StartCoroutine(ExecuteEnemyJustGuard());
+            yield return StartCoroutine(ExecuteAoEDamage());
         }
         else
         {
-            yield return StartCoroutine(ExecuteNormalDamage());
+            // ── 味方通常攻撃 + AttackAction 存在時：ジャストアタック分岐 ──
+            bool useJustAttack = _selectedAction == CharacterBattleController.ActionType.BasicAttack
+                && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Player
+                && _attackAction != null;
+
+            // ── 敵通常攻撃 + EnemyAttackAction 存在時：ジャストガード分岐 ──
+            bool useJustGuard = _selectedAction == CharacterBattleController.ActionType.BasicAttack
+                && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Enemy
+                && _enemyAttackAction != null;
+
+            if (useJustAttack)
+            {
+                yield return StartCoroutine(ExecuteJustAttack());
+            }
+            else if (useJustGuard)
+            {
+                yield return StartCoroutine(ExecuteEnemyJustGuard());
+            }
+            else
+            {
+                yield return StartCoroutine(ExecuteNormalDamage());
+            }
         }
 
         yield return StartCoroutine(TurnEnd());
@@ -536,6 +589,58 @@ public sealed class BattleManager : MonoBehaviour
         if (epGain > 0) _activeCharacter.AddEP(epGain);
 
         yield return new WaitForSeconds(_executeAnimDuration);
+    }
+
+    // ──────────────────────────────────────────────
+    // AoE ダメージ処理（全敵対象スキル）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteAoEDamage()
+    {
+        var targets = (_activeCharacter.CharacterFaction == CharacterBattleController.Faction.Player)
+            ? _enemyParty : _playerParty;
+
+        int baseDamage = _activeCharacter.CalculateSkillDamage();
+        CharacterStats.ElementType element = _activeCharacter.Stats != null
+            ? _activeCharacter.Stats.Element
+            : CharacterStats.ElementType.Physical;
+
+        Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} の全体スキル！ 基礎ダメージ: {baseDamage}");
+
+        foreach (var target in targets)
+        {
+            if (target == null || !target.IsAlive) continue;
+
+            int dealt = target.TakeDamage(baseDamage, element, _activeCharacter);
+
+            var damageResult = new CharacterBattleController.DamageResult
+            {
+                FinalDamage = dealt,
+                Element = element,
+                IsWeakness = target.Stats != null && target.Stats.IsWeakTo(element),
+                CausedBreak = target.IsBroken && target.CurrentToughness <= 0,
+                Target = target,
+                Attacker = _activeCharacter
+            };
+            OnDamageDealt?.Invoke(damageResult);
+
+            if (_cameraManager != null)
+            {
+                _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_SKILL_HIT);
+                if (damageResult.CausedBreak)
+                    _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BREAK);
+            }
+
+            Debug.Log($"[BattleManager] → {target.DisplayName} に {dealt} ダメージ！");
+
+            yield return new WaitForSecondsRealtime(0.15f);
+        }
+
+        // EP獲得
+        int epGain = _activeCharacter.GetEPGain(CharacterBattleController.ActionType.Skill);
+        if (epGain > 0) _activeCharacter.AddEP(epGain);
+
+        yield return new WaitForSeconds(_executeAnimDuration * 0.5f);
     }
 
     // ──────────────────────────────────────────────
