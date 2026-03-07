@@ -10,6 +10,7 @@ using UnityEngine;
 /// <summary>
 /// プレイヤーのインベントリを管理する。
 /// GameManager.Inventory でアクセスする。
+/// 全アイテムを Dictionary&lt;ItemData, int&gt; の単一ストアで管理する。
 /// </summary>
 public sealed class InventoryManager : MonoBehaviour
 {
@@ -25,35 +26,15 @@ public sealed class InventoryManager : MonoBehaviour
     /// <summary>インベントリの内容が変化したとき。</summary>
     public event Action OnInventoryChanged;
 
-    /// <summary>素材が追加されたとき。引数は (MaterialData, 変化後の個数)。</summary>
-    public event Action<MaterialData, int> OnMaterialAdded;
-
-    /// <summary>素材が消費されたとき。引数は (MaterialData, 変化後の個数)。</summary>
-    public event Action<MaterialData, int> OnMaterialConsumed;
-
     // ──────────────────────────────────────────────
-    // データ構造 — 汎用 ItemData ベース
+    // データ構造 — 単一ストア
     // ──────────────────────────────────────────────
 
-    /// <summary>ItemData → 所持数。</summary>
-    private readonly Dictionary<ItemData, int> _inventoryItems = new Dictionary<ItemData, int>();
+    /// <summary>ItemData → 所持数。全アイテム共通。</summary>
+    private readonly Dictionary<ItemData, int> _items = new Dictionary<ItemData, int>();
 
     // ──────────────────────────────────────────────
-    // データ構造 — 旧API互換（MaterialData / WeaponData）
-    // ──────────────────────────────────────────────
-
-    /// <summary>素材 ID → 所持数。</summary>
-    private readonly Dictionary<string, int> _materials = new Dictionary<string, int>();
-
-    /// <summary>素材 ID → MaterialData 参照（逆引き用）。</summary>
-    private readonly Dictionary<string, MaterialData> _materialDataMap
-        = new Dictionary<string, MaterialData>();
-
-    /// <summary>所持武器リスト。</summary>
-    private readonly List<WeaponData> _weapons = new List<WeaponData>();
-
-    // ──────────────────────────────────────────────
-    // 公開 API — 汎用 (ItemData ベース)
+    // 公開 API — 汎用 CRUD
     // ──────────────────────────────────────────────
 
     /// <summary>アイテムを追加する。</summary>
@@ -61,10 +42,10 @@ public sealed class InventoryManager : MonoBehaviour
     {
         if (item == null || amount <= 0) return;
 
-        if (_inventoryItems.ContainsKey(item))
-            _inventoryItems[item] = Mathf.Min(_inventoryItems[item] + amount, MAX_STACK_SIZE);
+        if (_items.TryGetValue(item, out int current))
+            _items[item] = Mathf.Min(current + amount, MAX_STACK_SIZE);
         else
-            _inventoryItems[item] = Mathf.Min(amount, MAX_STACK_SIZE);
+            _items[item] = Mathf.Min(amount, MAX_STACK_SIZE);
 
         OnInventoryChanged?.Invoke();
     }
@@ -74,12 +55,14 @@ public sealed class InventoryManager : MonoBehaviour
     {
         if (item == null || amount <= 0) return false;
 
-        if (!_inventoryItems.TryGetValue(item, out int current) || current < amount)
+        if (!_items.TryGetValue(item, out int current) || current < amount)
             return false;
 
-        _inventoryItems[item] = current - amount;
-        if (_inventoryItems[item] <= 0)
-            _inventoryItems.Remove(item);
+        int remaining = current - amount;
+        if (remaining <= 0)
+            _items.Remove(item);
+        else
+            _items[item] = remaining;
 
         OnInventoryChanged?.Invoke();
         return true;
@@ -89,17 +72,23 @@ public sealed class InventoryManager : MonoBehaviour
     public int GetCount(ItemData item)
     {
         if (item == null) return 0;
-        return _inventoryItems.TryGetValue(item, out int count) ? count : 0;
+        return _items.TryGetValue(item, out int count) ? count : 0;
+    }
+
+    /// <summary>指定アイテムを所持しているか。</summary>
+    public bool Has(ItemData item, int requiredAmount = 1)
+    {
+        return GetCount(item) >= requiredAmount;
     }
 
     /// <summary>所持中の全アイテムを返す（読み取り専用）。</summary>
-    public IReadOnlyDictionary<ItemData, int> GetAllItems() => _inventoryItems;
+    public IReadOnlyDictionary<ItemData, int> GetAllItems() => _items;
 
     /// <summary>指定型のアイテムだけを列挙する。</summary>
     public List<KeyValuePair<T, int>> GetItemsOfType<T>() where T : ItemData
     {
         var result = new List<KeyValuePair<T, int>>();
-        foreach (var kvp in _inventoryItems)
+        foreach (var kvp in _items)
         {
             if (kvp.Key is T typed)
                 result.Add(new KeyValuePair<T, int>(typed, kvp.Value));
@@ -108,85 +97,102 @@ public sealed class InventoryManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
-    // 公開 API — 素材（旧API互換）
-    // ──────────────────────────────────────────────
-
-    /// <summary>素材を追加する。</summary>
-    public void AddMaterial(MaterialData data, int amount = 1)
-    {
-        if (data == null || amount <= 0) return;
-
-        string id = data.Id;
-
-        if (!_materialDataMap.ContainsKey(id))
-            _materialDataMap[id] = data;
-
-        if (!_materials.ContainsKey(id))
-            _materials[id] = 0;
-
-        _materials[id] = Mathf.Min(_materials[id] + amount, MAX_STACK_SIZE);
-        OnMaterialAdded?.Invoke(data, _materials[id]);
-        OnInventoryChanged?.Invoke();
-    }
-
-    /// <summary>素材を消費する。不足時は false を返し何もしない。</summary>
-    public bool TryConsumeMaterial(MaterialData data, int amount = 1)
-    {
-        if (data == null || amount <= 0) return false;
-
-        string id = data.Id;
-
-        if (!_materials.TryGetValue(id, out int current) || current < amount)
-            return false;
-
-        _materials[id] = current - amount;
-
-        if (_materials[id] <= 0)
-        {
-            _materials.Remove(id);
-            _materialDataMap.Remove(id);
-        }
-
-        OnMaterialConsumed?.Invoke(data, _materials.GetValueOrDefault(id, 0));
-        OnInventoryChanged?.Invoke();
-        return true;
-    }
-
-    /// <summary>指定素材の所持数を返す。</summary>
-    public int GetMaterialCount(MaterialData data)
-    {
-        if (data == null) return 0;
-        return _materials.GetValueOrDefault(data.Id, 0);
-    }
-
-    /// <summary>所持中の全素材を返す（読み取り専用）。</summary>
-    public IReadOnlyDictionary<string, int> GetAllMaterials() => _materials;
-
-    // ──────────────────────────────────────────────
-    // 公開 API — 武器
-    // ──────────────────────────────────────────────
-
-    /// <summary>武器を追加する。</summary>
-    public void AddWeapon(WeaponData weapon)
-    {
-        if (weapon != null) _weapons.Add(weapon);
-        OnInventoryChanged?.Invoke();
-    }
-
-    /// <summary>所持武器リスト（読み取り専用）。</summary>
-    public IReadOnlyList<WeaponData> Weapons => _weapons;
-
-    // ──────────────────────────────────────────────
     // 公開 API — 全クリア
     // ──────────────────────────────────────────────
 
     /// <summary>全インベントリを空にする。</summary>
     public void ClearAll()
     {
-        _inventoryItems.Clear();
-        _materials.Clear();
-        _materialDataMap.Clear();
-        _weapons.Clear();
+        _items.Clear();
+#pragma warning disable CS0612, CS0618
+        _legacyMaterials.Clear();
+#pragma warning restore CS0612, CS0618
         OnInventoryChanged?.Invoke();
     }
+
+    // ──────────────────────────────────────────────
+    // 旧API互換ラッパー（廃止予定）
+    // ──────────────────────────────────────────────
+
+#pragma warning disable CS0612, CS0618 // Obsolete 警告を抑制
+
+    /// <summary>[Obsolete] Add(ItemData, int) を使用してください。</summary>
+    [Obsolete("AddMaterial は廃止予定です。Add(ItemData, int) を使用してください。")]
+    public void AddMaterial(MaterialData data, int amount = 1)
+    {
+        if (data == null || amount <= 0) return;
+        if (!_legacyMaterials.TryGetValue(data.Id, out var e))
+            e = new LegacyMaterialEntry { Data = data, Count = 0 };
+        e.Count = Mathf.Min(e.Count + amount, MAX_STACK_SIZE);
+        _legacyMaterials[data.Id] = e;
+        OnInventoryChanged?.Invoke();
+    }
+
+    /// <summary>[Obsolete] Remove(ItemData, int) を使用してください。</summary>
+    [Obsolete("TryConsumeMaterial は廃止予定です。Remove(ItemData, int) を使用してください。")]
+    public bool TryConsumeMaterial(MaterialData data, int amount = 1)
+    {
+        if (data == null || amount <= 0) return false;
+        if (!_legacyMaterials.TryGetValue(data.Id, out var e) || e.Count < amount)
+            return false;
+        e.Count -= amount;
+        if (e.Count <= 0)
+            _legacyMaterials.Remove(data.Id);
+        else
+            _legacyMaterials[data.Id] = e;
+        OnInventoryChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>[Obsolete] GetCount(ItemData) を使用してください。</summary>
+    [Obsolete("GetMaterialCount は廃止予定です。GetCount(ItemData) を使用してください。")]
+    public int GetMaterialCount(MaterialData data)
+    {
+        if (data == null) return 0;
+        return _legacyMaterials.TryGetValue(data.Id, out var e) ? e.Count : 0;
+    }
+
+    /// <summary>[Obsolete] GetAllItems() を使用してください。</summary>
+    [Obsolete("GetAllMaterials は廃止予定です。GetAllItems() を使用してください。")]
+    public IReadOnlyDictionary<string, int> GetAllMaterials()
+    {
+        var result = new Dictionary<string, int>();
+        foreach (var kvp in _legacyMaterials)
+            result[kvp.Key] = kvp.Value.Count;
+        return result;
+    }
+
+    /// <summary>[Obsolete] Add(WeaponData) を使用してください。</summary>
+    [Obsolete("AddWeapon は廃止予定です。Add(ItemData, int) を使用してください。")]
+    public void AddWeapon(WeaponData weapon)
+    {
+        if (weapon != null) Add(weapon, 1);
+    }
+
+    /// <summary>[Obsolete] GetItemsOfType&lt;WeaponData&gt;() を使用してください。</summary>
+    [Obsolete("Weapons は廃止予定です。GetItemsOfType<WeaponData>() を使用してください。")]
+    public IReadOnlyList<WeaponData> Weapons
+    {
+        get
+        {
+            var list = new List<WeaponData>();
+            foreach (var kvp in _items)
+            {
+                if (kvp.Key is WeaponData w)
+                    list.Add(w);
+            }
+            return list;
+        }
+    }
+
+    // 旧 MaterialData 用の内部ストレージ（MaterialData は ItemData 非継承のため）
+    private struct LegacyMaterialEntry
+    {
+        public MaterialData Data;
+        public int Count;
+    }
+    private readonly Dictionary<string, LegacyMaterialEntry> _legacyMaterials
+        = new Dictionary<string, LegacyMaterialEntry>();
+
+#pragma warning restore CS0612, CS0618
 }

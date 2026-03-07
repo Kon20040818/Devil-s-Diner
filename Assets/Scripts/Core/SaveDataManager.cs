@@ -3,6 +3,7 @@
 // GameManager と同一 GameObject にアタッチ。
 // ゲーム進行データの JSON シリアライズ / デシリアライズを担当する。
 // ============================================================
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -18,15 +19,27 @@ public sealed class SaveDataManager : MonoBehaviour
     // ──────────────────────────────────────────────
 
     /// <summary>JSON に書き出すゲーム進行データ。</summary>
-    [System.Serializable]
+    [Serializable]
     public class SaveData
     {
         public int CurrentDay;
         public int Gold;
+
+        /// <summary>全アイテム共通エントリ。</summary>
+        public List<ItemEntry> Items;
+
+        /// <summary>旧フォーマット互換用（読み込み専用）。</summary>
         public List<MaterialEntry> Materials;
 
-        /// <summary>素材 1 エントリ分。</summary>
-        [System.Serializable]
+        [Serializable]
+        public class ItemEntry
+        {
+            public string ItemID;
+            public int Amount;
+        }
+
+        /// <summary>旧フォーマット互換用。</summary>
+        [Serializable]
         public class MaterialEntry
         {
             public string Id;
@@ -62,29 +75,28 @@ public sealed class SaveDataManager : MonoBehaviour
             return;
         }
 
-        // SaveData 構築
         var saveData = new SaveData
         {
             CurrentDay = gm.CurrentDay,
             Gold       = gm.Gold,
-            Materials  = new List<SaveData.MaterialEntry>()
+            Items      = new List<SaveData.ItemEntry>()
         };
 
-        // 素材
-        foreach (KeyValuePair<string, int> kvp in gm.Inventory.GetAllMaterials())
+        // 全アイテムを ItemID ベースで保存
+        foreach (var kvp in gm.Inventory.GetAllItems())
         {
-            saveData.Materials.Add(new SaveData.MaterialEntry
+            if (kvp.Key == null || string.IsNullOrEmpty(kvp.Key.ItemID)) continue;
+            saveData.Items.Add(new SaveData.ItemEntry
             {
-                Id     = kvp.Key,
+                ItemID = kvp.Key.ItemID,
                 Amount = kvp.Value
             });
         }
 
-        // JSON 書き出し
         string json = JsonUtility.ToJson(saveData, true);
         File.WriteAllText(FilePath, json);
 
-        Debug.Log($"[SaveDataManager] セーブ完了 → {FilePath}");
+        Debug.Log($"[SaveDataManager] セーブ完了 → {FilePath} ({saveData.Items.Count} アイテム)");
     }
 
     // ──────────────────────────────────────────────
@@ -123,22 +135,47 @@ public sealed class SaveDataManager : MonoBehaviour
         // ── インベントリクリア ──
         gm.Inventory.ClearAll();
 
-        // ── 素材復元 ──
-        if (saveData.Materials != null && saveData.Materials.Count > 0)
+        // ── ItemData ルックアップ構築 ──
+        ItemData[] allItems = Resources.LoadAll<ItemData>("");
+        var itemLookup = new Dictionary<string, ItemData>(allItems.Length);
+        foreach (ItemData item in allItems)
         {
+            if (item != null && !string.IsNullOrEmpty(item.ItemID))
+                itemLookup[item.ItemID] = item;
+        }
+
+        // ── 新フォーマット (Items) でロード ──
+        if (saveData.Items != null && saveData.Items.Count > 0)
+        {
+            foreach (var entry in saveData.Items)
+            {
+                if (itemLookup.TryGetValue(entry.ItemID, out ItemData itemData))
+                {
+                    gm.Inventory.Add(itemData, entry.Amount);
+                }
+                else
+                {
+                    Debug.LogWarning($"[SaveDataManager] ItemID '{entry.ItemID}' に対応する ItemData が見つかりません。スキップします。");
+                }
+            }
+        }
+        // ── 旧フォーマット (Materials) との後方互換 ──
+        else if (saveData.Materials != null && saveData.Materials.Count > 0)
+        {
+            Debug.Log("[SaveDataManager] 旧フォーマット (Materials) を検出。互換ロードを実行します。");
+
+#pragma warning disable CS0612, CS0618
             MaterialData[] allMaterials = Resources.LoadAll<MaterialData>("");
-            var materialLookup = new Dictionary<string, MaterialData>(allMaterials.Length);
+            var matLookup = new Dictionary<string, MaterialData>(allMaterials.Length);
             foreach (MaterialData mat in allMaterials)
             {
                 if (mat != null && !string.IsNullOrEmpty(mat.Id))
-                {
-                    materialLookup[mat.Id] = mat;
-                }
+                    matLookup[mat.Id] = mat;
             }
 
-            foreach (SaveData.MaterialEntry entry in saveData.Materials)
+            foreach (var entry in saveData.Materials)
             {
-                if (materialLookup.TryGetValue(entry.Id, out MaterialData matData))
+                if (matLookup.TryGetValue(entry.Id, out MaterialData matData))
                 {
                     gm.Inventory.AddMaterial(matData, entry.Amount);
                 }
@@ -147,6 +184,7 @@ public sealed class SaveDataManager : MonoBehaviour
                     Debug.LogWarning($"[SaveDataManager] 素材 ID '{entry.Id}' に対応する MaterialData が見つかりません。スキップします。");
                 }
             }
+#pragma warning restore CS0612, CS0618
         }
 
         Debug.Log("[SaveDataManager] ロード完了。");

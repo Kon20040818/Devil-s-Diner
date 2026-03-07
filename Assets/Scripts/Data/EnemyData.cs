@@ -14,17 +14,17 @@ public sealed class EnemyData : ScriptableObject
     [SerializeField] private int _baseAttack = 50;
 
     [Header("ドロップ設定")]
-    [SerializeField] private MaterialData _dropItemNormal;
-    [SerializeField] private MaterialData _dropItemJust;
+    [SerializeField] private ItemData _dropItemNormal;
+    [SerializeField] private ItemData _dropItemJust;
     [SerializeField, Range(0f, 1f)] private float _dropRateNormal = 0.8f;
     [SerializeField, Range(0f, 1f)] private float _dropRateJust = 1.0f;
 
-    public string       Id              => _id;
-    public string       EnemyName       => _enemyName;
-    public int          MaxHP           => _maxHP;
-    public int          BaseAttack      => _baseAttack;
-    public MaterialData DropItemNormal  => _dropItemNormal;
-    public MaterialData DropItemJust    => _dropItemJust;
-    public float        DropRateNormal  => _dropRateNormal;
-    public float        DropRateJust    => _dropRateJust;
+    public string   Id              => _id;
+    public string   EnemyName       => _enemyName;
+    public int      MaxHP           => _maxHP;
+    public int      BaseAttack      => _baseAttack;
+    public ItemData DropItemNormal  => _dropItemNormal;
+    public ItemData DropItemJust    => _dropItemJust;
+    public float    DropRateNormal  => _dropRateNormal;
+    public float    DropRateJust    => _dropRateJust;
 }

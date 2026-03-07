@@ -6,7 +6,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 敵撃破時の素材ドロップを判定する静的クラス。
+/// 敵撃破時のアイテムドロップを判定する静的クラス。
 /// バトル終了時に呼び出される。
 /// </summary>
 public static class DropResolver
@@ -20,7 +20,7 @@ public static class DropResolver
     {
         if (enemyData == null) return;
 
-        MaterialData dropItem;
+        ItemData dropItem;
         float dropRate;
 
         if (isCritical && enemyData.DropItemJust != null)
@@ -43,8 +43,8 @@ public static class DropResolver
         {
             if (GameManager.Instance != null)
             {
-                GameManager.Instance.Inventory.AddMaterial(dropItem);
-                Debug.Log($"[DropResolver] ドロップ成功: {dropItem.MaterialName}");
+                GameManager.Instance.Inventory.Add(dropItem);
+                Debug.Log($"[DropResolver] ドロップ成功: {dropItem.DisplayName}");
             }
         }
     }

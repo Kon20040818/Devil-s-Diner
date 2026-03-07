@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// デバッグ用チートコントローラー。
-/// F1: ダミー素材を全種10個ずつ追加
+/// F1: テストアイテムを追加
 /// F2: 所持金 +1000G
 /// F4: 手動セーブ
 /// F5: 手動ロード
@@ -20,8 +20,8 @@ public sealed class DebugController : MonoBehaviour
     // Inspector
     // ──────────────────────────────────────────────
 
-    [SerializeField] private MaterialData[] _debugMaterials;
-    [SerializeField] private int _materialAddAmount = 10;
+    [SerializeField] private ItemData[] _debugItems;
+    [SerializeField] private int _itemAddAmount = 10;
     [SerializeField] private int _goldAddAmount = 1000;
 
     // ──────────────────────────────────────────────
@@ -35,7 +35,7 @@ public sealed class DebugController : MonoBehaviour
 
         if (kb.f1Key.wasPressedThisFrame)
         {
-            AddDebugMaterials();
+            AddDebugItems();
         }
 
         if (kb.f2Key.wasPressedThisFrame)
@@ -59,28 +59,28 @@ public sealed class DebugController : MonoBehaviour
     // 内部メソッド
     // ──────────────────────────────────────────────
 
-    private void AddDebugMaterials()
+    private void AddDebugItems()
     {
-        MaterialData[] materials = _debugMaterials;
+        ItemData[] items = _debugItems;
 
-        if (materials == null || materials.Length == 0)
+        if (items == null || items.Length == 0)
         {
-            materials = Resources.LoadAll<MaterialData>("");
+            items = Resources.LoadAll<ItemData>("");
         }
 
-        if (materials == null || materials.Length == 0)
+        if (items == null || items.Length == 0)
         {
-            Debug.LogWarning("[DebugController] 追加できる MaterialData が見つかりません。");
+            Debug.LogWarning("[DebugController] 追加できる ItemData が見つかりません。");
             return;
         }
 
-        foreach (MaterialData mat in materials)
+        foreach (ItemData item in items)
         {
-            GameManager.Instance.Inventory.AddMaterial(mat, _materialAddAmount);
-            Debug.Log($"[DebugController] {mat.name} x{_materialAddAmount} 追加");
+            GameManager.Instance.Inventory.Add(item, _itemAddAmount);
+            Debug.Log($"[DebugController] {item.DisplayName} x{_itemAddAmount} 追加");
         }
 
-        Debug.Log($"[DebugController] デバッグ素材追加完了！ {materials.Length}種 x {_materialAddAmount}個");
+        Debug.Log($"[DebugController] デバッグアイテム追加完了！ {items.Length}種 x {_itemAddAmount}個");
     }
 
     private void ManualSave()

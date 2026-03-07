@@ -112,7 +112,7 @@ public static class DevilsDinerSetupTool
 
     private static void CreateScriptableObjects()
     {
-        CreateSOIfNotExists<MaterialData>("Assets/Data/Materials", "MAT_Dummy");
+        CreateSOIfNotExists<IngredientData>("Assets/Data/Ingredients", "ING_Dummy");
         CreateSOIfNotExists<WeaponData>("Assets/Data/Weapons", "WPN_Dummy");
         CreateSOIfNotExists<EnemyData>("Assets/Data/Enemies", "ENM_Dummy");
 
