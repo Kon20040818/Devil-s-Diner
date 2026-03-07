@@ -95,6 +95,15 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
         }
         battleManager.SetAttackAction(attackAction);
 
+        // ── EnemyAttackAction（ジャストガード）検索・自動生成・結線 ──
+        EnemyAttackAction enemyAttackAction = FindFirstObjectByType<EnemyAttackAction>();
+        if (enemyAttackAction == null)
+        {
+            enemyAttackAction = gameObject.AddComponent<EnemyAttackAction>();
+            Debug.Log("[BattleSceneBootstrap] EnemyAttackAction を自動生成しました。");
+        }
+        battleManager.SetEnemyAttackAction(enemyAttackAction);
+
         // ── バトル開始（パーティ配列をセットし、キューを構築する） ──
         battleManager.StartBattle(playerList.ToArray(), enemyList.ToArray());
 

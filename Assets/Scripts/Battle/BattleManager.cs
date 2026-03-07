@@ -136,6 +136,17 @@ public sealed class BattleManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
+    // EnemyAttackAction（ジャストガード）参照
+    // ──────────────────────────────────────────────
+
+    private EnemyAttackAction _enemyAttackAction;
+
+    public void SetEnemyAttackAction(EnemyAttackAction enemyAttackAction)
+    {
+        _enemyAttackAction = enemyAttackAction;
+    }
+
+    // ──────────────────────────────────────────────
     // 公開 API — バトル開始
     // ──────────────────────────────────────────────
 
@@ -359,9 +370,18 @@ public sealed class BattleManager : MonoBehaviour
             && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Player
             && _attackAction != null;
 
+        // ── 敵通常攻撃 + EnemyAttackAction 存在時：ジャストガード分岐 ──
+        bool useJustGuard = _selectedAction == CharacterBattleController.ActionType.BasicAttack
+            && _activeCharacter.CharacterFaction == CharacterBattleController.Faction.Enemy
+            && _enemyAttackAction != null;
+
         if (useJustAttack)
         {
             yield return StartCoroutine(ExecuteJustAttack());
+        }
+        else if (useJustGuard)
+        {
+            yield return StartCoroutine(ExecuteEnemyJustGuard());
         }
         else
         {
@@ -493,6 +513,79 @@ public sealed class BattleManager : MonoBehaviour
         AddSP(1);
         int epGain = _activeCharacter.GetEPGain(_selectedAction);
         if (epGain > 0) _activeCharacter.AddEP(epGain);
+    }
+
+    // ──────────────────────────────────────────────
+    // ジャストガード処理（EnemyAttackAction 連携・敵攻撃）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteEnemyJustGuard()
+    {
+        int baseDamage = _activeCharacter.CalculateDamage(_selectedAction);
+        CharacterStats.ElementType element = _activeCharacter.Stats != null
+            ? _activeCharacter.Stats.Element
+            : CharacterStats.ElementType.Physical;
+
+        int totalDealt = 0;
+        int hitCount = _enemyAttackAction.HitCount;
+        int perHitDamage = Mathf.Max(1, baseDamage / hitCount);
+
+        yield return StartCoroutine(_enemyAttackAction.ExecuteAttackCoroutine((hitIndex, guardResult) =>
+        {
+            if (_selectedTarget == null || !_selectedTarget.IsAlive) return;
+
+            float multiplier = guardResult switch
+            {
+                EnemyAttackAction.GuardResult.JustGuard => _enemyAttackAction.JustGuardMultiplier,
+                EnemyAttackAction.GuardResult.NormalGuard => _enemyAttackAction.NormalGuardMultiplier,
+                _ => 1.0f
+            };
+
+            int hitDamage = Mathf.RoundToInt(perHitDamage * multiplier);
+            int dealt = _selectedTarget.TakeDamage(hitDamage, element, _activeCharacter);
+            totalDealt += dealt;
+
+            var damageResult = new CharacterBattleController.DamageResult
+            {
+                FinalDamage = dealt,
+                Element = element,
+                IsWeakness = _selectedTarget.Stats != null && _selectedTarget.Stats.IsWeakTo(element),
+                CausedBreak = _selectedTarget.IsBroken && _selectedTarget.CurrentToughness <= 0,
+                Target = _selectedTarget,
+                Attacker = _activeCharacter
+            };
+            OnDamageDealt?.Invoke(damageResult);
+
+            if (_cameraManager != null)
+            {
+                // ジャストガード成功時は軽めのシェイク、失敗時は敵攻撃級
+                switch (guardResult)
+                {
+                    case EnemyAttackAction.GuardResult.JustGuard:
+                        _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BASIC_HIT);
+                        break;
+                    case EnemyAttackAction.GuardResult.NormalGuard:
+                        _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BASIC_HIT);
+                        break;
+                    default:
+                        _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_ENEMY_HIT);
+                        break;
+                }
+
+                if (damageResult.CausedBreak)
+                    _cameraManager.ShakeCamera(BattleCameraManager.SHAKE_BREAK);
+            }
+
+            string guardLabel = guardResult switch
+            {
+                EnemyAttackAction.GuardResult.JustGuard => "JUST GUARD!",
+                EnemyAttackAction.GuardResult.NormalGuard => "Guard",
+                _ => "NO GUARD"
+            };
+            Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} Hit {hitIndex + 1} ({guardLabel}) → {_selectedTarget.DisplayName} に {dealt} ダメージ！");
+        }));
+
+        Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} 敵攻撃合計 → {totalDealt} ダメージ（ジャストガード付き）");
     }
 
     private IEnumerator TurnEnd()
