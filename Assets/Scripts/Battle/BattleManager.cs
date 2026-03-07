@@ -172,6 +172,17 @@ public sealed class BattleManager : MonoBehaviour
     public List<string> RecruitedDemons { get; } = new List<string>();
 
     // ──────────────────────────────────────────────
+    // BuffDurationTracker（バフ持続管理）参照
+    // ──────────────────────────────────────────────
+
+    private BuffDurationTracker _buffDurationTracker;
+
+    public void SetBuffDurationTracker(BuffDurationTracker tracker)
+    {
+        _buffDurationTracker = tracker;
+    }
+
+    // ──────────────────────────────────────────────
     // 食事選択（DishInstance 連携）
     // ──────────────────────────────────────────────
 
@@ -681,6 +692,9 @@ public sealed class BattleManager : MonoBehaviour
                 Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} が {dish} で {healAmount} HP回復！");
             }));
 
+            // バフ持続ターン追跡に登録
+            _buffDurationTracker?.RegisterBuff(dish);
+
             _selectedDish = null;
         }
         else if (_mealAction != null)
@@ -738,6 +752,9 @@ public sealed class BattleManager : MonoBehaviour
         _activeCharacter.SetState(CharacterBattleController.BattleState.WaitingTurn);
 
         if (_cameraManager != null) _cameraManager.SwitchToOverview();
+
+        // バフ持続ターン管理（リジェネ適用 + デクリメント + 期限切れ除去）
+        _buffDurationTracker?.ProcessTurnEnd(_activeCharacter);
 
         yield return new WaitForSeconds(0.3f);
 

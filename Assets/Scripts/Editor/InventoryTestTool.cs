@@ -30,12 +30,17 @@ public sealed class InventoryTestTool : EditorWindow
         // ── アセット生成 ──
         EditorGUILayout.LabelField("ScriptableObject 生成", EditorStyles.miniBoldLabel);
 
+        if (GUILayout.Button("品質テーブル(QualityScaleTable)を生成"))
+        {
+            CreateDefaultQualityScaleTable();
+        }
+
         if (GUILayout.Button("テスト用 IngredientData を3つ生成"))
         {
             CreateTestIngredients();
         }
 
-        if (GUILayout.Button("テスト用 DishData を2つ生成"))
+        if (GUILayout.Button("テスト用 DishData を4つ生成（各カテゴリ）"))
         {
             CreateTestDishes();
         }
@@ -50,6 +55,11 @@ public sealed class InventoryTestTool : EditorWindow
             AddTestItemsToInventory();
         }
 
+        if (GUILayout.Button("テスト用 DishInstance をインベントリに追加"))
+        {
+            AddTestDishInstancesToInventory();
+        }
+
         if (GUILayout.Button("インベントリをログ出力"))
         {
             LogInventory();
@@ -61,6 +71,22 @@ public sealed class InventoryTestTool : EditorWindow
     // ──────────────────────────────────────────────
     // アセット生成
     // ──────────────────────────────────────────────
+
+    private static void CreateDefaultQualityScaleTable()
+    {
+        EnsureDirectory(ASSET_DIR);
+        string path = $"{ASSET_DIR}/QualityScaleTable.asset";
+        if (AssetDatabase.LoadAssetAtPath<QualityScaleTable>(path) != null)
+        {
+            Debug.Log("[InventoryTestTool] QualityScaleTable は既に存在します。");
+            return;
+        }
+
+        var table = CreateInstance<QualityScaleTable>();
+        AssetDatabase.CreateAsset(table, path);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[InventoryTestTool] デフォルト QualityScaleTable を生成しました。");
+    }
 
     private static void CreateTestIngredients()
     {
@@ -79,12 +105,21 @@ public sealed class InventoryTestTool : EditorWindow
     {
         EnsureDirectory(ASSET_DIR);
 
-        CreateDish("DISH_DevilSteak",  "悪魔ステーキ",   "ジューシーな悪魔肉のステーキ。", 80,  15, 200);
-        CreateDish("DISH_HellCurry",   "地獄カレー",     "辛さが癖になる一品。",           120, 25, 350);
+        var qualityTable = AssetDatabase.LoadAssetAtPath<QualityScaleTable>(
+            $"{ASSET_DIR}/QualityScaleTable.asset");
+
+        CreateDish("DISH_DevilSteak",  "悪魔ステーキ", "ジューシーな悪魔肉のステーキ。",
+            80, 200, DishCategory.Meat,    0.15f, 3, 0.05f, 200, 50, 5f, qualityTable);
+        CreateDish("DISH_SoulSashimi", "魂の刺身",     "透き通るように美しい刺身。",
+            60, 280, DishCategory.Fish,    0.12f, 4, 0.08f, 280, 60, 4f, qualityTable);
+        CreateDish("DISH_HellCurry",   "地獄カレー",   "辛さが癖になる一品。",
+            120, 350, DishCategory.Salad,  0.10f, 3, 0.03f, 350, 70, 6f, qualityTable);
+        CreateDish("DISH_AbyssTart",   "深淵タルト",   "甘い闇の味がする至高のデザート。",
+            100, 400, DishCategory.Dessert, 0.08f, 5, 0.04f, 400, 80, 5f, qualityTable);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[InventoryTestTool] テスト用 DishData を2つ生成しました。");
+        Debug.Log("[InventoryTestTool] テスト用 DishData を4つ生成しました。");
     }
 
     private static void CreateIngredient(string id, string displayName, string desc, int rarity, float dropRate, int sellPrice)
@@ -94,7 +129,6 @@ public sealed class InventoryTestTool : EditorWindow
 
         var data = CreateInstance<IngredientData>();
 
-        // SerializedObject 経由で private フィールドを設定
         var so = new SerializedObject(data);
         so.FindProperty("_itemID").stringValue       = id;
         so.FindProperty("_displayName").stringValue  = displayName;
@@ -108,7 +142,12 @@ public sealed class InventoryTestTool : EditorWindow
         AssetDatabase.CreateAsset(data, path);
     }
 
-    private static void CreateDish(string id, string displayName, string desc, int hpRecovery, int appeal, int sellPrice)
+    private static void CreateDish(
+        string id, string displayName, string desc,
+        int hpRecovery, int sellPrice,
+        DishCategory category, float baseBuff, int buffDuration,
+        float scoutBonus, int shopPrice, int baseSatisfaction,
+        float servingTime, QualityScaleTable qualityTable)
     {
         string path = $"{ASSET_DIR}/{id}.asset";
         if (AssetDatabase.LoadAssetAtPath<DishData>(path) != null) return;
@@ -116,13 +155,20 @@ public sealed class InventoryTestTool : EditorWindow
         var data = CreateInstance<DishData>();
 
         var so = new SerializedObject(data);
-        so.FindProperty("_itemID").stringValue        = id;
-        so.FindProperty("_displayName").stringValue   = displayName;
-        so.FindProperty("_description").stringValue   = desc;
-        so.FindProperty("_sellPrice").intValue         = sellPrice;
-        so.FindProperty("_hpRecoveryAmount").intValue  = hpRecovery;
-        so.FindProperty("_appealValue").intValue       = appeal;
-        so.FindProperty("_servingTime").floatValue     = 5f;
+        so.FindProperty("_itemID").stringValue            = id;
+        so.FindProperty("_displayName").stringValue       = displayName;
+        so.FindProperty("_description").stringValue       = desc;
+        so.FindProperty("_sellPrice").intValue             = sellPrice;
+        so.FindProperty("_hpRecoveryAmount").intValue      = hpRecovery;
+        so.FindProperty("_servingTime").floatValue         = servingTime;
+        so.FindProperty("_category").enumValueIndex        = (int)category;
+        so.FindProperty("_baseBuff").floatValue            = baseBuff;
+        so.FindProperty("_buffDurationTurns").intValue     = buffDuration;
+        so.FindProperty("_scoutBonus").floatValue          = scoutBonus;
+        so.FindProperty("_shopPrice").intValue             = shopPrice;
+        so.FindProperty("_baseSatisfaction").intValue      = baseSatisfaction;
+        if (qualityTable != null)
+            so.FindProperty("_qualityTable").objectReferenceValue = qualityTable;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         AssetDatabase.CreateAsset(data, path);
@@ -136,7 +182,6 @@ public sealed class InventoryTestTool : EditorWindow
     {
         var inv = GameManager.Instance.Inventory;
 
-        // Data フォルダからテストアイテムを検索して追加
         var guids = AssetDatabase.FindAssets("t:ItemData", new[] { ASSET_DIR });
         int count = 0;
         foreach (string guid in guids)
@@ -153,15 +198,44 @@ public sealed class InventoryTestTool : EditorWindow
         Debug.Log($"[InventoryTestTool] {count} 種のテストアイテムを各5個追加しました。");
     }
 
+    private static void AddTestDishInstancesToInventory()
+    {
+        var inv = GameManager.Instance.Inventory;
+
+        var guids = AssetDatabase.FindAssets("t:DishData", new[] { ASSET_DIR });
+        int count = 0;
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var dishData = AssetDatabase.LoadAssetAtPath<DishData>(path);
+            if (dishData == null) continue;
+
+            foreach (DishQuality quality in System.Enum.GetValues(typeof(DishQuality)))
+            {
+                var instance = new DishInstance(dishData, quality);
+                inv.AddDish(instance, 2);
+                count++;
+            }
+        }
+
+        Debug.Log($"[InventoryTestTool] {count} 種の DishInstance を各2個追加しました。");
+    }
+
     private static void LogInventory()
     {
         var inv = GameManager.Instance.Inventory;
         var items = inv.GetAllItems();
+        var dishes = inv.GetAllDishes();
 
-        Debug.Log($"[InventoryTestTool] === インベントリ内容 ({items.Count} 種) ===");
+        Debug.Log($"[InventoryTestTool] === インベントリ内容 (汎用:{items.Count} 種 + 料理:{dishes.Count} 種) ===");
         foreach (var kvp in items)
         {
-            Debug.Log($"  {kvp.Key.DisplayName} (ID:{kvp.Key.ItemID}) x{kvp.Value}");
+            Debug.Log($"  [Item] {kvp.Key.DisplayName} (ID:{kvp.Key.ItemID}) x{kvp.Value}");
+        }
+        foreach (var kvp in dishes)
+        {
+            Debug.Log($"  [Dish] {kvp.Key} (HP:{kvp.Key.HealAmount} Buff:{kvp.Key.BuffAmount:F2} Scout:{kvp.Key.ScoutBonus:F3}) x{kvp.Value}");
         }
     }
 

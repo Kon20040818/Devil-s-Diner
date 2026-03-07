@@ -104,6 +104,29 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
         }
         battleManager.SetEnemyAttackAction(enemyAttackAction);
 
+        // ── MealAction（食事）検索・自動生成・結線 ──
+        MealAction mealAction = FindFirstObjectByType<MealAction>();
+        if (mealAction == null)
+        {
+            mealAction = gameObject.AddComponent<MealAction>();
+            Debug.Log("[BattleSceneBootstrap] MealAction を自動生成しました。");
+        }
+        battleManager.SetMealAction(mealAction);
+
+        // ── MealBuffApplier（食事バフ）検索・自動生成・結線 ──
+        MealBuffApplier mealBuffApplier = FindFirstObjectByType<MealBuffApplier>();
+        if (mealBuffApplier == null)
+        {
+            mealBuffApplier = gameObject.AddComponent<MealBuffApplier>();
+            Debug.Log("[BattleSceneBootstrap] MealBuffApplier を自動生成しました。");
+        }
+        mealAction.SetBuffApplier(mealBuffApplier);
+
+        // ── BuffDurationTracker（バフ持続管理）自動生成・結線 ──
+        BuffDurationTracker buffTracker = gameObject.AddComponent<BuffDurationTracker>();
+        battleManager.SetBuffDurationTracker(buffTracker);
+        Debug.Log("[BattleSceneBootstrap] BuffDurationTracker を自動生成しました。");
+
         // ── バトル開始（パーティ配列をセットし、キューを構築する） ──
         battleManager.StartBattle(playerList.ToArray(), enemyList.ToArray());
 

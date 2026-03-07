@@ -13,6 +13,7 @@
 // ・パースペクティブ偽装（カメラ回り込み時の ScaleX / Rotate 微調整）
 // ============================================================
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -25,7 +26,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     // 列挙
     // ──────────────────────────────────────────────
 
-    private enum UIMode { Hidden, CommandSelect, TargetSelect }
+    private enum UIMode { Hidden, CommandSelect, TargetSelect, MealSelect }
 
     // ──────────────────────────────────────────────
     // 定数
@@ -101,6 +102,12 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private int _selectedTargetIndex;
     private CharacterBattleController.ActionType _pendingAction;
     private readonly List<CharacterBattleController> _targetList = new List<CharacterBattleController>();
+
+    // Meal 選択
+    private VisualElement _mealPanel;
+    private readonly List<DishInstance> _mealList = new List<DishInstance>();
+    private readonly List<int> _mealQuantities = new List<int>();
+    private int _selectedMealIndex;
 
     // SmoothDamp 状態
     private Vector2 _currentPanelPos;
@@ -333,6 +340,12 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         // 初期位置を即座に設定（SmoothDampの初回ジャンプ防止）
         _currentPanelPos = GetTargetPanelPos();
 
+        // Meal 選択パネル（target-panel と同構造）
+        _mealPanel = new VisualElement();
+        _mealPanel.AddToClassList("target-panel");
+        _mealPanel.AddToClassList("hidden");
+        _commandMenu.Add(_mealPanel);
+
         BuildSPPips();
         HandleSPChanged(_battleManager.CurrentSP, _battleManager.MaxSP);
         BuildPartyStatusCards();
@@ -512,6 +525,19 @@ public sealed class DynamicBattleUIController : MonoBehaviour
                 _targetPanel[i].style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
             }
         }
+
+        // ── 料理選択パネル追従 ──
+        if (_mode == UIMode.MealSelect && _mealPanel != null)
+        {
+            for (int i = 0; i < _mealPanel.childCount; i++)
+            {
+                _mealPanel[i].style.translate = new Translate(
+                    _currentPanelPos.x - 130f * distanceScale,
+                    _currentPanelPos.y + (-60f + i * 62f) * distanceScale
+                );
+                _mealPanel[i].style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
+            }
+        }
     }
 
     // ════════════════════════════════════════════════
@@ -588,6 +614,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         UpdateCommandHighlight();
 
         _targetPanel?.AddToClassList("hidden");
+        _mealPanel?.AddToClassList("hidden");
         _commandButtons?.RemoveFromClassList("hidden");
         if (_cmdHint != null) _cmdHint.text = "[W]△ [D]○ [A]× [S]□  [X] Cancel";
 
@@ -597,6 +624,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private void HideCommandMenu()
     {
         _mode = UIMode.Hidden;
+        _mealPanel?.AddToClassList("hidden");
         _commandMenu?.AddToClassList("hidden");
     }
 
@@ -792,6 +820,23 @@ public sealed class DynamicBattleUIController : MonoBehaviour
             if (confirm) ConfirmTarget();
             if (cancel)  ReturnToCommandMode();
         }
+        else if (_mode == UIMode.MealSelect)
+        {
+            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.up.wasPressedThisFrame);
+            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
+            bool confirm = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cancel  = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
+
+            if (navUp)   NavigateMeal(-1);
+            else if (navDown) NavigateMeal(+1);
+
+            if (confirm) ConfirmMeal();
+            if (cancel)  ReturnFromMealSelect();
+        }
     }
 
     private void SelectAndConfirmCommand(int index)
@@ -814,16 +859,10 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
         _pendingAction = SLOT_TO_ACTION[_selectedCommandIndex];
 
-        // Meal は自身が対象 → ターゲット選択をスキップして即実行
+        // Meal → 料理選択サブメニューへ遷移
         if (_pendingAction == CharacterBattleController.ActionType.Meal)
         {
-            var self = _battleManager.ActiveCharacter;
-            if (self != null)
-            {
-                Debug.Log($"[DynamicBattleUI] Meal → {self.DisplayName} (自身)");
-                HideCommandMenu();
-                _battleManager.ExecutePlayerAction(_pendingAction, self);
-            }
+            EnterMealSelection();
             return;
         }
 
@@ -846,6 +885,155 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
         HideCommandMenu();
         _battleManager.ExecutePlayerAction(_pendingAction, target);
+    }
+
+    // ════════════════════════════════════════════════
+    // 料理選択
+    // ════════════════════════════════════════════════
+
+    private void EnterMealSelection()
+    {
+        _mealList.Clear();
+        _mealQuantities.Clear();
+        _selectedMealIndex = 0;
+
+        if (GameManager.Instance == null || GameManager.Instance.Inventory == null)
+        {
+            StartCoroutine(ShowNoMealsAndReturn());
+            return;
+        }
+
+        var allDishes = GameManager.Instance.Inventory.GetAllDishes();
+        foreach (var kvp in allDishes)
+        {
+            if (kvp.Value > 0)
+            {
+                _mealList.Add(kvp.Key);
+                _mealQuantities.Add(kvp.Value);
+            }
+        }
+
+        if (_mealList.Count == 0)
+        {
+            StartCoroutine(ShowNoMealsAndReturn());
+            return;
+        }
+
+        _mode = UIMode.MealSelect;
+        _commandButtons?.AddToClassList("hidden");
+        _targetPanel?.AddToClassList("hidden");
+        _mealPanel?.RemoveFromClassList("hidden");
+
+        RebuildMealEntries();
+        UpdateMealHighlight();
+
+        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Back  [W/S] Select";
+    }
+
+    private IEnumerator ShowNoMealsAndReturn()
+    {
+        if (_cmdHint != null) _cmdHint.text = "料理がありません";
+        yield return new WaitForSecondsRealtime(1.2f);
+        ReturnToCommandMode();
+    }
+
+    private void RebuildMealEntries()
+    {
+        if (_mealPanel == null) return;
+        _mealPanel.Clear();
+
+        for (int i = 0; i < _mealList.Count; i++)
+        {
+            var dish = _mealList[i];
+            int qty = _mealQuantities[i];
+
+            var slot = new VisualElement();
+            slot.AddToClassList("target-slot");
+
+            var bg = new VisualElement();
+            bg.AddToClassList("target-bg");
+
+            // 品質バッジ + 料理名
+            string qualityBadge = dish.Quality switch
+            {
+                DishQuality.Normal   => "",
+                DishQuality.Fine     => "[Fine] ",
+                DishQuality.Premium  => "[Premium] ",
+                DishQuality.Masterwork => "[Master] ",
+                _ => ""
+            };
+
+            // バフ種別テキスト
+            string buffType = dish.Category switch
+            {
+                DishCategory.Meat    => "ATK",
+                DishCategory.Fish    => "SPD",
+                DishCategory.Salad   => "DEF",
+                DishCategory.Dessert => "RGN",
+                _ => "---"
+            };
+
+            var nameLabel = new Label($"{qualityBadge}{dish}");
+            nameLabel.AddToClassList("target-text");
+
+            var detailLabel = new Label($"HP+{dish.HealAmount}  {buffType}+{dish.BuffAmount:F0}%  x{qty}");
+            detailLabel.AddToClassList("target-hp");
+
+            slot.Add(bg);
+            slot.Add(nameLabel);
+            slot.Add(detailLabel);
+
+            int idx = i;
+            slot.RegisterCallback<ClickEvent>(_ =>
+            {
+                _selectedMealIndex = idx;
+                UpdateMealHighlight();
+                ConfirmMeal();
+            });
+
+            _mealPanel.Add(slot);
+        }
+    }
+
+    private void UpdateMealHighlight()
+    {
+        if (_mealPanel == null) return;
+
+        for (int i = 0; i < _mealPanel.childCount; i++)
+        {
+            if (i == _selectedMealIndex)
+                _mealPanel[i].AddToClassList("is-active");
+            else
+                _mealPanel[i].RemoveFromClassList("is-active");
+        }
+    }
+
+    private void NavigateMeal(int delta)
+    {
+        if (_mealList.Count == 0) return;
+        _selectedMealIndex = (_selectedMealIndex + delta + _mealList.Count) % _mealList.Count;
+        UpdateMealHighlight();
+    }
+
+    private void ConfirmMeal()
+    {
+        if (_mealList.Count == 0 || _selectedMealIndex >= _mealList.Count) return;
+
+        var selected = _mealList[_selectedMealIndex];
+        var self = _battleManager.ActiveCharacter;
+        if (self == null) return;
+
+        _battleManager.SetSelectedDish(selected);
+        Debug.Log($"[DynamicBattleUI] Meal 選択: {selected} → {self.DisplayName}");
+
+        HideCommandMenu();
+        _battleManager.ExecutePlayerAction(CharacterBattleController.ActionType.Meal, self);
+    }
+
+    private void ReturnFromMealSelect()
+    {
+        _mealPanel?.AddToClassList("hidden");
+        ReturnToCommandMode();
     }
 
     // ════════════════════════════════════════════════
