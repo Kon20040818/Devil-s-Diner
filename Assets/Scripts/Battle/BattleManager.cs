@@ -158,6 +158,20 @@ public sealed class BattleManager : MonoBehaviour
     }
 
     // ──────────────────────────────────────────────
+    // ScoutAction（スカウト）参照
+    // ──────────────────────────────────────────────
+
+    private ScoutAction _scoutAction;
+
+    public void SetScoutAction(ScoutAction scoutAction)
+    {
+        _scoutAction = scoutAction;
+    }
+
+    /// <summary>スカウトで雇用した悪魔名リスト（経営フェーズへの引き継ぎ用）。</summary>
+    public List<string> RecruitedDemons { get; } = new List<string>();
+
+    // ──────────────────────────────────────────────
     // 公開 API — バトル開始
     // ──────────────────────────────────────────────
 
@@ -344,11 +358,21 @@ public sealed class BattleManager : MonoBehaviour
         // ── Meal: 自身回復 → ターン消費して即終了 ──
         if (_selectedAction == CharacterBattleController.ActionType.Meal)
         {
-            // カメラ: 自身にフォーカス
             if (_cameraManager != null)
                 _cameraManager.FocusOnCharacter(_activeCharacter.transform);
 
             yield return StartCoroutine(ExecuteMeal());
+            yield return StartCoroutine(TurnEnd());
+            yield break;
+        }
+
+        // ── Scout: 敵のスカウト → ターン消費して即終了 ──
+        if (_selectedAction == CharacterBattleController.ActionType.Scout)
+        {
+            if (_cameraManager != null)
+                _cameraManager.SwitchToActionCamera(_activeCharacter.transform, _selectedTarget.transform);
+
+            yield return StartCoroutine(ExecuteScout());
             yield return StartCoroutine(TurnEnd());
             yield break;
         }
@@ -643,6 +667,36 @@ public sealed class BattleManager : MonoBehaviour
             _activeCharacter.Heal(50);
             int actualHeal = _activeCharacter.CurrentHP - hpBefore;
             Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} は手作り弁当を食べた！ HPが{actualHeal}回復した！ (HP: {_activeCharacter.CurrentHP}/{_activeCharacter.MaxHP})");
+            yield return new WaitForSeconds(0.5f);
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // スカウト処理（敵を雇用・バトルから除外）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteScout()
+    {
+        if (_scoutAction != null)
+        {
+            yield return StartCoroutine(_scoutAction.ExecuteActionCoroutine(_selectedTarget, success =>
+            {
+                if (success)
+                {
+                    RecruitedDemons.Add(_selectedTarget.DisplayName);
+                    _selectedTarget.ScoutRemove();
+                    Debug.Log($"[BattleManager] {_selectedTarget.DisplayName} をスカウト成功！ 雇用リストに追加。");
+                }
+                else
+                {
+                    Debug.Log($"[BattleManager] {_selectedTarget.DisplayName} のスカウトに失敗...");
+                }
+            }));
+        }
+        else
+        {
+            // ScoutAction 未アタッチ時のフォールバック: 必ず失敗
+            Debug.Log($"[BattleManager] ScoutAction が未設定のためスカウト失敗。");
             yield return new WaitForSeconds(0.5f);
         }
     }

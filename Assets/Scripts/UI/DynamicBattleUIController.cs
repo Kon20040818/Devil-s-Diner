@@ -66,7 +66,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         CharacterBattleController.ActionType.Skill,        // ARCHETYPE
         CharacterBattleController.ActionType.BasicAttack,   // WEAPON
         CharacterBattleController.ActionType.Meal,         // MEAL
-        CharacterBattleController.ActionType.BasicAttack,   // ITEM (placeholder)
+        CharacterBattleController.ActionType.Scout,          // SCOUT
         CharacterBattleController.ActionType.BasicAttack,   // GUARD (placeholder)
     };
 

@@ -51,7 +51,8 @@ public sealed class CharacterBattleController : MonoBehaviour
         BasicAttack,
         Skill,
         Ultimate,
-        Meal
+        Meal,
+        Scout
     }
 
     /// <summary>ダメージ結果を格納する構造体。UI表示に使用。</summary>
@@ -73,6 +74,7 @@ public sealed class CharacterBattleController : MonoBehaviour
     private int _currentEP;
     private int _currentToughness;
     private bool _isBroken;
+    private bool _isScouted;
 
     // ──────────────────────────────────────────────
     // プロパティ
@@ -119,6 +121,9 @@ public sealed class CharacterBattleController : MonoBehaviour
 
     /// <summary>靭性システムが有効か。</summary>
     public bool HasToughness => MaxToughness > 0;
+
+    /// <summary>スカウトによって雇用されたか。</summary>
+    public bool IsScouted => _isScouted;
 
     // ──────────────────────────────────────────────
     // イベント
@@ -252,6 +257,20 @@ public sealed class CharacterBattleController : MonoBehaviour
         if (!IsAlive) return;
         _currentHP = Mathf.Min(_currentHP + amount, MaxHP);
         OnHPChanged?.Invoke(_currentHP, MaxHP);
+    }
+
+    /// <summary>
+    /// スカウトによりバトルから除外する。
+    /// 通常の戦闘不能と異なりドロップ処理をスキップする。
+    /// </summary>
+    public void ScoutRemove()
+    {
+        _isScouted = true;
+        _currentHP = 0;
+        OnHPChanged?.Invoke(_currentHP, MaxHP);
+        SetState(BattleState.Down);
+        OnDeath?.Invoke(this);
+        Debug.Log($"[Battle] {DisplayName} はスカウトされてバトルから離脱した！");
     }
 
     // ──────────────────────────────────────────────
