@@ -24,6 +24,13 @@ public sealed class BattleResultController : MonoBehaviour
     [Tooltip("リザルト画面の表示時間（秒）")]
     [SerializeField] private float _resultDisplayDuration = 4.0f;
 
+    [Header("鮮度バフ計算")]
+    [Tooltip("ジャスト成功率に掛ける係数")]
+    [SerializeField] private float _justRateCoefficient = 0.5f;
+
+    [Tooltip("スカウト数に掛ける係数")]
+    [SerializeField] private float _scoutCountCoefficient = 0.1f;
+
     [Header("シーン遷移")]
     [Tooltip("バトル後に遷移するシーン名")]
     [SerializeField] private string _returnSceneName = "FieldScene";
@@ -124,6 +131,9 @@ public sealed class BattleResultController : MonoBehaviour
         // スカウト結果のバフ抽選 → StaffManager へ引き渡し
         ProcessScoutedDemons();
 
+        // 鮮度バフ計算 → GameManager に反映
+        ComputeAndApplyFreshnessBuff();
+
         // 勝利演出
         if (_effectsUI != null)
             yield return _effectsUI.PlayVictoryEffect();
@@ -152,6 +162,33 @@ public sealed class BattleResultController : MonoBehaviour
         {
             Debug.LogWarning("[BattleResult] StaffManager が未初期化のためスカウト結果を保存できません。");
         }
+    }
+
+    // ──────────────────────────────────────────────
+    // 鮮度バフ計算
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    /// バトル成績から鮮度バフ倍率を算出し、GameManager に反映する。
+    /// 計算式: 1.0 + (justRate × 係数) + (scoutCount × 係数), clamp [1.0, 2.0]
+    /// </summary>
+    private void ComputeAndApplyFreshnessBuff()
+    {
+        if (_battleManager == null || GameManager.Instance == null) return;
+
+        float justRate = _battleManager.JustRate;
+        int scoutCount = _battleManager.ScoutedEnemies.Count;
+
+        float buff = 1.0f
+            + (justRate * _justRateCoefficient)
+            + (scoutCount * _scoutCountCoefficient);
+
+        buff = Mathf.Clamp(buff, 1.0f, 2.0f);
+
+        GameManager.Instance.DailyFreshnessBuff = buff;
+
+        Debug.Log($"[BattleResult] 鮮度バフ: {buff:F2} (ジャスト率: {justRate:P0}, スカウト数: {scoutCount}, " +
+                  $"総ヒット: {_battleManager.TotalHitCount}, ジャスト: {_battleManager.JustHitCount})");
     }
 
     // ──────────────────────────────────────────────

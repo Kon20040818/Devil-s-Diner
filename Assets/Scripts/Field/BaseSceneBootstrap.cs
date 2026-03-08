@@ -17,11 +17,23 @@ public sealed class BaseSceneBootstrap : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        // BaseSceneUI 検索
+        // CookingManager を配置
+        CookingManager cookingMgr = FindFirstObjectByType<CookingManager>();
+        if (cookingMgr == null)
+        {
+            var go = new GameObject("CookingManager");
+            cookingMgr = go.AddComponent<CookingManager>();
+        }
+
+        // BaseSceneUI 検索 & 初期化
         BaseSceneUI baseUI = FindFirstObjectByType<BaseSceneUI>();
         if (baseUI == null)
         {
             Debug.LogWarning("[BaseSceneBootstrap] BaseSceneUI が見つかりません。");
+        }
+        else
+        {
+            baseUI.Initialize(cookingMgr);
         }
 
         Debug.Log("[BaseSceneBootstrap] 拠点シーン結線完了。");

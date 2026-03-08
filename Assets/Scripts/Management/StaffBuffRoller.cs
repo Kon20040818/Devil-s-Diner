@@ -62,6 +62,12 @@ public static class StaffBuffRoller
     {
         if (allRaces == null || allRaces.Length == 0) return null;
 
+        // EnemyData に直接紐付けされた種族を最優先
+        if (enemy.EnemyData != null && enemy.EnemyData.StaffRace != null)
+        {
+            return enemy.EnemyData.StaffRace;
+        }
+
         // Stats.Id で RaceID と照合
         if (enemy.Stats != null && !string.IsNullOrEmpty(enemy.Stats.Id))
         {

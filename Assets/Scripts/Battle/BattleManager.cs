@@ -65,6 +65,10 @@ public sealed class BattleManager : MonoBehaviour
     private bool _isDoubleSpeed;
     private bool _isUltimateInProgress;
 
+    // ジャストアタック成績（鮮度バフ計算用）
+    private int _totalHitCount;
+    private int _justHitCount;
+
     // ──────────────────────────────────────────────
     // プロパティ
     // ──────────────────────────────────────────────
@@ -86,6 +90,15 @@ public sealed class BattleManager : MonoBehaviour
 
     /// <summary>倍速中か。</summary>
     public bool IsDoubleSpeed => _isDoubleSpeed;
+
+    /// <summary>ジャストアタック成功率（0〜1）。鮮度バフ計算に使用。</summary>
+    public float JustRate => _totalHitCount > 0 ? (float)_justHitCount / _totalHitCount : 0f;
+
+    /// <summary>バトル中の総ヒット数。</summary>
+    public int TotalHitCount => _totalHitCount;
+
+    /// <summary>バトル中のジャスト成功数。</summary>
+    public int JustHitCount => _justHitCount;
 
     // ──────────────────────────────────────────────
     // イベント
@@ -239,6 +252,10 @@ public sealed class BattleManager : MonoBehaviour
         // SP初期化
         _currentSP = _initialSP;
         OnSPChanged?.Invoke(_currentSP, _maxSP);
+
+        // ジャストアタック成績リセット
+        _totalHitCount = 0;
+        _justHitCount = 0;
 
         _queue.Clear();
 
@@ -680,6 +697,10 @@ public sealed class BattleManager : MonoBehaviour
 
         yield return StartCoroutine(_attackAction.ExecuteAttackCoroutine((hitIndex, isJust) =>
         {
+            // ジャストアタック成績を記録
+            _totalHitCount++;
+            if (isJust) _justHitCount++;
+
             if (_selectedTarget == null || !_selectedTarget.IsAlive) return;
 
             int hitDamage = isJust
