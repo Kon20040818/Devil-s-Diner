@@ -121,6 +121,9 @@ public sealed class BattleResultController : MonoBehaviour
 
         Debug.Log($"[BattleResult] 勝利！ ゴールド: +{totalGold}G, ドロップ: {drops.Count}件判定");
 
+        // スカウト結果のバフ抽選 → StaffManager へ引き渡し
+        ProcessScoutedDemons();
+
         // 勝利演出
         if (_effectsUI != null)
             yield return _effectsUI.PlayVictoryEffect();
@@ -128,6 +131,27 @@ public sealed class BattleResultController : MonoBehaviour
         // リザルトUI表示
         if (_resultUI != null)
             _resultUI.ShowVictory(totalGold, drops);
+    }
+
+    // ──────────────────────────────────────────────
+    // スカウト結果処理
+    // ──────────────────────────────────────────────
+
+    /// <summary>スカウト済み悪魔のバフを一括抽選し、StaffManager に渡す。</summary>
+    private void ProcessScoutedDemons()
+    {
+        if (_battleManager == null || _battleManager.ScoutedEnemies.Count == 0) return;
+
+        var recruits = StaffBuffRoller.RollAll(_battleManager.ScoutedEnemies);
+
+        if (GameManager.Instance != null && GameManager.Instance.Staff != null)
+        {
+            GameManager.Instance.Staff.ReceiveRecruits(recruits);
+        }
+        else
+        {
+            Debug.LogWarning("[BattleResult] StaffManager が未初期化のためスカウト結果を保存できません。");
+        }
     }
 
     // ──────────────────────────────────────────────

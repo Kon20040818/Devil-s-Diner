@@ -168,8 +168,27 @@ public sealed class BattleManager : MonoBehaviour
         _scoutAction = scoutAction;
     }
 
-    /// <summary>スカウトで雇用した悪魔名リスト（経営フェーズへの引き継ぎ用）。</summary>
-    public List<string> RecruitedDemons { get; } = new List<string>();
+    /// <summary>スカウトで雇用した悪魔データリスト（経営フェーズへの引き継ぎ用）。</summary>
+    public List<ScoutedEnemyRecord> ScoutedEnemies { get; } = new List<ScoutedEnemyRecord>();
+
+    /// <summary>スカウト成功時の一時記録。バトル終了後に StaffBuffRoller でバフ抽選される。</summary>
+    public struct ScoutedEnemyRecord
+    {
+        public string DisplayName;
+        public CharacterStats Stats;
+        public EnemyData EnemyData;
+    }
+
+    /// <summary>[後方互換] スカウト済み名リスト。</summary>
+    public List<string> RecruitedDemons
+    {
+        get
+        {
+            var names = new List<string>(ScoutedEnemies.Count);
+            foreach (var s in ScoutedEnemies) names.Add(s.DisplayName);
+            return names;
+        }
+    }
 
     // ──────────────────────────────────────────────
     // BuffDurationTracker（バフ持続管理）参照
@@ -833,7 +852,12 @@ public sealed class BattleManager : MonoBehaviour
             {
                 if (success)
                 {
-                    RecruitedDemons.Add(_selectedTarget.DisplayName);
+                    ScoutedEnemies.Add(new ScoutedEnemyRecord
+                    {
+                        DisplayName = _selectedTarget.DisplayName,
+                        Stats = _selectedTarget.Stats,
+                        EnemyData = _selectedTarget.EnemyData
+                    });
                     _selectedTarget.ScoutRemove();
                     Debug.Log($"[BattleManager] {_selectedTarget.DisplayName} をスカウト成功！ 雇用リストに追加。");
                 }

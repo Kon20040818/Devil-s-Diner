@@ -24,9 +24,13 @@ public sealed class SaveDataManager : MonoBehaviour
     {
         public int CurrentDay;
         public int Gold;
+        public int ChefLevel = 1;
 
         /// <summary>全アイテム共通エントリ。</summary>
         public List<ItemEntry> Items;
+
+        /// <summary>常勤スタッフ。</summary>
+        public List<StaffEntry> PermanentStaff;
 
         /// <summary>旧フォーマット互換用（読み込み専用）。</summary>
         public List<MaterialEntry> Materials;
@@ -38,6 +42,17 @@ public sealed class SaveDataManager : MonoBehaviour
             public int Amount;
             /// <summary>料理の品質。料理以外は null。</summary>
             public string Quality;
+        }
+
+        /// <summary>スタッフ保存用エントリ。</summary>
+        [Serializable]
+        public class StaffEntry
+        {
+            public string ID;
+            public string SourceEnemyName;
+            public string RaceID;
+            public string[] BuffIDs;
+            public int MoralePenalty;
         }
 
         /// <summary>旧フォーマット互換用。</summary>
@@ -81,7 +96,8 @@ public sealed class SaveDataManager : MonoBehaviour
         {
             CurrentDay = gm.CurrentDay,
             Gold       = gm.Gold,
-            Items      = new List<SaveData.ItemEntry>()
+            Items      = new List<SaveData.ItemEntry>(),
+            PermanentStaff = new List<SaveData.StaffEntry>()
         };
 
         // 汎用アイテムを ItemID ベースで保存
@@ -107,10 +123,39 @@ public sealed class SaveDataManager : MonoBehaviour
             });
         }
 
+        // 常勤スタッフを保存（臨時は翌朝消えるため保存しない）
+        if (gm.Staff != null)
+        {
+            foreach (var staff in gm.Staff.PermanentStaff)
+            {
+                var buffIDs = new string[staff.RandomBuffs.Length];
+                for (int i = 0; i < staff.RandomBuffs.Length; i++)
+                {
+                    buffIDs[i] = staff.RandomBuffs[i] != null ? staff.RandomBuffs[i].BuffID : "";
+                }
+
+                saveData.PermanentStaff.Add(new SaveData.StaffEntry
+                {
+                    ID = staff.ID,
+                    SourceEnemyName = staff.SourceEnemyName,
+                    RaceID = staff.Race != null ? staff.Race.RaceID : "",
+                    BuffIDs = buffIDs,
+                    MoralePenalty = staff.MoralePenalty
+                });
+            }
+        }
+
+        // シェフレベルを保存
+        var cookingMgr = FindFirstObjectByType<CookingManager>();
+        if (cookingMgr != null)
+        {
+            saveData.ChefLevel = cookingMgr.ChefLevel;
+        }
+
         string json = JsonUtility.ToJson(saveData, true);
         File.WriteAllText(FilePath, json);
 
-        Debug.Log($"[SaveDataManager] セーブ完了 → {FilePath} ({saveData.Items.Count} アイテム)");
+        Debug.Log($"[SaveDataManager] セーブ完了 → {FilePath} ({saveData.Items.Count} アイテム, {saveData.PermanentStaff.Count} スタッフ)");
     }
 
     // ──────────────────────────────────────────────
@@ -207,6 +252,49 @@ public sealed class SaveDataManager : MonoBehaviour
                 }
             }
 #pragma warning restore CS0612, CS0618
+        }
+
+        // ── スタッフ復元 ──
+        if (saveData.PermanentStaff != null && saveData.PermanentStaff.Count > 0 && gm.Staff != null)
+        {
+            gm.Staff.ClearAll();
+
+            // ルックアップ構築
+            StaffRaceData[] allRaces = Resources.LoadAll<StaffRaceData>("");
+            var raceLookup = new Dictionary<string, StaffRaceData>(allRaces.Length);
+            foreach (var race in allRaces)
+            {
+                if (race != null && !string.IsNullOrEmpty(race.RaceID))
+                    raceLookup[race.RaceID] = race;
+            }
+
+            StaffBuffData[] allBuffs = Resources.LoadAll<StaffBuffData>("");
+            var buffLookup = new Dictionary<string, StaffBuffData>(allBuffs.Length);
+            foreach (var buff in allBuffs)
+            {
+                if (buff != null && !string.IsNullOrEmpty(buff.BuffID))
+                    buffLookup[buff.BuffID] = buff;
+            }
+
+            foreach (var entry in saveData.PermanentStaff)
+            {
+                StaffRaceData race = null;
+                if (!string.IsNullOrEmpty(entry.RaceID))
+                    raceLookup.TryGetValue(entry.RaceID, out race);
+
+                var buffs = new List<StaffBuffData>();
+                if (entry.BuffIDs != null)
+                {
+                    foreach (var buffID in entry.BuffIDs)
+                    {
+                        if (!string.IsNullOrEmpty(buffID) && buffLookup.TryGetValue(buffID, out var buff))
+                            buffs.Add(buff);
+                    }
+                }
+
+                var staff = new StaffInstance(entry.SourceEnemyName, race, buffs.ToArray(), StaffSlotType.Permanent);
+                gm.Staff.TryHire(staff, StaffSlotType.Permanent);
+            }
         }
 
         Debug.Log("[SaveDataManager] ロード完了。");

@@ -116,6 +116,20 @@ public sealed class GameManager : MonoBehaviour
     public SaveDataManager SaveData { get; private set; }
 
     // ──────────────────────────────────────────────
+    // StaffManager 参照
+    // ──────────────────────────────────────────────
+
+    /// <summary>スタッフ管理。GameManager と同じ GameObject にアタッチ。</summary>
+    public StaffManager Staff { get; private set; }
+
+    // ──────────────────────────────────────────────
+    // 鮮度バフ（バトル成績由来）
+    // ──────────────────────────────────────────────
+
+    /// <summary>当日の鮮度バフ。BattleResult から書き込まれ、CookingManager が参照する。</summary>
+    public float DailyFreshnessBuff { get; set; } = 1f;
+
+    // ──────────────────────────────────────────────
     // Lifecycle
     // ──────────────────────────────────────────────
 
@@ -150,6 +164,13 @@ public sealed class GameManager : MonoBehaviour
             saveDataMgr = gameObject.AddComponent<SaveDataManager>();
         }
         SaveData = saveDataMgr;
+
+        // StaffManager を追加
+        if (!TryGetComponent(out StaffManager staffMgr))
+        {
+            staffMgr = gameObject.AddComponent<StaffManager>();
+        }
+        Staff = staffMgr;
 
         // AudioManager を追加
         if (!TryGetComponent(out AudioManager _audioMgr))
@@ -215,9 +236,19 @@ public sealed class GameManager : MonoBehaviour
                 break;
 
             case GamePhase.Evening:
-                // 経営 → 拠点（日数+1、自動セーブ）
+                // 経営 → 拠点（日数+1、給料支払い、臨時消去、自動セーブ）
                 AdvanceDay();
                 SetPhase(GamePhase.Morning);
+
+                // 朝の給料支払い + 臨時スタッフ消去
+                if (Staff != null)
+                {
+                    Staff.ProcessMorningPayroll();
+                    Staff.ClearTemporaryStaff();
+                }
+
+                // 鮮度バフリセット（翌日は新しいバトル成績で再計算）
+                DailyFreshnessBuff = 1f;
 
                 if (SaveData != null)
                 {
@@ -278,7 +309,9 @@ public sealed class GameManager : MonoBehaviour
         CurrentDay   = STARTING_DAY;
         CurrentPhase = GamePhase.Morning;
         Gold         = STARTING_GOLD;
+        DailyFreshnessBuff = 1f;
         Inventory.ClearAll();
+        Staff?.ClearAll();
     }
 
     // ──────────────────────────────────────────────
