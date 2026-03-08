@@ -12,9 +12,29 @@ using UnityEngine.InputSystem;
 /// </summary>
 public sealed class FieldSceneBootstrap : MonoBehaviour
 {
+    private InputAction _returnAction;
+
     private void Start()
     {
         WireFieldScene();
+    }
+
+    private void Update()
+    {
+        // ESC キーで経営パートへ帰還
+        if (_returnAction != null && _returnAction.WasPressedThisFrame())
+        {
+            Debug.Log("[FieldSceneBootstrap] 帰還！経営パートへ遷移します。");
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.AdvancePhase();
+            }
+        }
+    }
+
+    private void OnDisable()
+    {
+        _returnAction?.Disable();
     }
 
     private void WireFieldScene()
@@ -79,6 +99,10 @@ public sealed class FieldSceneBootstrap : MonoBehaviour
             symbol.SetPlayer(playerTransform);
             encounterHandler.RegisterSymbol(symbol);
         }
+
+        // ── 帰還アクション（ESC キー）──
+        _returnAction = new InputAction("Return", InputActionType.Button, "<Keyboard>/escape");
+        _returnAction.Enable();
 
         Debug.Log($"[FieldSceneBootstrap] フィールドシーン結線完了。プレイヤー: 1, 敵シンボル: {symbols.Length}体");
     }

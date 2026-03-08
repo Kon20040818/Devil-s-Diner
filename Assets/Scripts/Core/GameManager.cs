@@ -21,9 +21,10 @@ public sealed class GameManager : MonoBehaviour
     // ──────────────────────────────────────────────
     // 定数
     // ──────────────────────────────────────────────
-    private const string BOOT_SCENE    = "BootScene";
-    private const string BASE_SCENE    = "BaseScene";
-    private const string FIELD_SCENE   = "FieldScene";
+    private const string BOOT_SCENE       = "BootScene";
+    private const string BASE_SCENE       = "BaseScene";
+    private const string FIELD_SCENE      = "FieldScene";
+    private const string MANAGEMENT_SCENE = "ManagementScene";
     private const float  DEFAULT_FIXED_DELTA_TIME = 0.02f; // 50 Hz
     private const int    STARTING_GOLD = 500;
     private const int    STARTING_DAY  = 1;
@@ -35,10 +36,12 @@ public sealed class GameManager : MonoBehaviour
     /// <summary>ゲームフェーズ。</summary>
     public enum GamePhase
     {
-        /// <summary>出撃準備（ActionScene ロード前）</summary>
+        /// <summary>出撃準備（BaseScene）</summary>
         Morning,
-        /// <summary>狩猟アクション（ActionScene）</summary>
-        Noon
+        /// <summary>フィールド探索＋バトル（FieldScene / BattleScene）</summary>
+        Noon,
+        /// <summary>経営パート（ManagementScene）</summary>
+        Evening
     }
 
     // ──────────────────────────────────────────────
@@ -200,18 +203,26 @@ public sealed class GameManager : MonoBehaviour
         switch (CurrentPhase)
         {
             case GamePhase.Morning:
+                // 拠点 → フィールド探索
                 SetPhase(GamePhase.Noon);
                 LoadSceneAsync(FIELD_SCENE);
                 break;
 
             case GamePhase.Noon:
+                // フィールド → 経営パート
+                SetPhase(GamePhase.Evening);
+                LoadSceneAsync(MANAGEMENT_SCENE);
+                break;
+
+            case GamePhase.Evening:
+                // 経営 → 拠点（日数+1、自動セーブ）
                 AdvanceDay();
                 SetPhase(GamePhase.Morning);
 
                 if (SaveData != null)
                 {
                     SaveData.Save();
-                    Debug.Log("[GameManager] フェーズ遷移 (Noon → Morning) で自動セーブ実行。");
+                    Debug.Log("[GameManager] フェーズ遷移 (Evening → Morning) で自動セーブ実行。");
                 }
 
                 LoadSceneAsync(BASE_SCENE);
