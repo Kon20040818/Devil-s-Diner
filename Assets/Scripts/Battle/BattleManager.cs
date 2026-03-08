@@ -296,12 +296,14 @@ public sealed class BattleManager : MonoBehaviour
     {
         if (CurrentPhase != BattlePhase.PlayerCommand) return;
 
-        // AoE スキルは target null を許容する
+        // AoE スキル・Guard・Meal は target null を許容する
         bool isAoE = actionType == CharacterBattleController.ActionType.Skill
             && _activeCharacter.Stats != null
             && _activeCharacter.Stats.SkillTargetMode == CharacterStats.TargetingMode.AllEnemies;
+        bool isSelfAction = actionType == CharacterBattleController.ActionType.Guard
+            || actionType == CharacterBattleController.ActionType.Meal;
 
-        if (!isAoE && (target == null || !target.IsAlive)) return;
+        if (!isAoE && !isSelfAction && (target == null || !target.IsAlive)) return;
 
         // SP/EP バリデーション
         switch (actionType)
@@ -385,6 +387,13 @@ public sealed class BattleManager : MonoBehaviour
         }
 
         OnActiveCharacterChanged?.Invoke(_activeCharacter);
+
+        // 自分のターンが回ってきたらガード状態を解除（被弾で消費されなかった場合）
+        if (_activeCharacter.IsGuarding)
+        {
+            _activeCharacter.SetGuarding(false);
+        }
+
         Debug.Log($"[BattleManager] 次の行動: {_activeCharacter.DisplayName} ({_activeCharacter.CharacterFaction})");
 
         if (_cameraManager != null) _cameraManager.FocusOnCharacter(_activeCharacter.transform);
@@ -443,6 +452,17 @@ public sealed class BattleManager : MonoBehaviour
     {
         SetPhase(BattlePhase.Executing);
         _activeCharacter.SetState(CharacterBattleController.BattleState.Executing);
+
+        // ── Guard: 防御姿勢 → ターン消費して即終了 ──
+        if (_selectedAction == CharacterBattleController.ActionType.Guard)
+        {
+            if (_cameraManager != null)
+                _cameraManager.FocusOnCharacter(_activeCharacter.transform);
+
+            yield return StartCoroutine(ExecuteGuard());
+            yield return StartCoroutine(TurnEnd());
+            yield break;
+        }
 
         // ── Meal: 自身回復 → ターン消費して即終了 ──
         if (_selectedAction == CharacterBattleController.ActionType.Meal)
@@ -813,6 +833,21 @@ public sealed class BattleManager : MonoBehaviour
         }));
 
         Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} 敵攻撃合計 → {totalDealt} ダメージ（ジャストガード付き）");
+    }
+
+    // ──────────────────────────────────────────────
+    // ガード処理（防御姿勢・ターン消費）
+    // ──────────────────────────────────────────────
+
+    private IEnumerator ExecuteGuard()
+    {
+        _activeCharacter.SetGuarding(true);
+        Debug.Log($"[BattleManager] {_activeCharacter.DisplayName} は防御姿勢をとった！（次のダメージ50%軽減）");
+
+        // SP+1（防御報酬）
+        AddSP(1);
+
+        yield return new WaitForSeconds(0.5f);
     }
 
     // ──────────────────────────────────────────────

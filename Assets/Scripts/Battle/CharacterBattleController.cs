@@ -52,7 +52,8 @@ public sealed class CharacterBattleController : MonoBehaviour
         Skill,
         Ultimate,
         Meal,
-        Scout
+        Scout,
+        Guard
     }
 
     /// <summary>ダメージ結果を格納する構造体。UI表示に使用。</summary>
@@ -75,6 +76,7 @@ public sealed class CharacterBattleController : MonoBehaviour
     private int _currentToughness;
     private bool _isBroken;
     private bool _isScouted;
+    private bool _isGuarding;
     private EnemyData _enemyData;
 
     // ──────────────────────────────────────────────
@@ -125,6 +127,12 @@ public sealed class CharacterBattleController : MonoBehaviour
 
     /// <summary>スカウトによって雇用されたか。</summary>
     public bool IsScouted => _isScouted;
+
+    /// <summary>ガード状態か。次にダメージを受けると解除され、ダメージが半減する。</summary>
+    public bool IsGuarding => _isGuarding;
+
+    /// <summary>ガード状態を設定する。</summary>
+    public void SetGuarding(bool value) => _isGuarding = value;
 
     /// <summary>敵データ（ドロップ・ゴールド報酬用）。敵のみセット。</summary>
     public EnemyData EnemyData => _enemyData;
@@ -206,8 +214,17 @@ public sealed class CharacterBattleController : MonoBehaviour
         // 靭性破壊中はダメージ増加 (+25%)
         float breakBonus = _isBroken ? 1.25f : 1.0f;
 
+        // ガード中はダメージ半減（1回限り）
+        float guardReduction = 1.0f;
+        if (_isGuarding)
+        {
+            guardReduction = 0.5f;
+            _isGuarding = false;
+            Debug.Log($"[Battle] {DisplayName} はガードでダメージを軽減！");
+        }
+
         int reducedDamage = Mathf.Max(rawDamage - defense, 1);
-        int finalDamage = Mathf.Max(Mathf.RoundToInt(reducedDamage * (1f - resistance) * breakBonus), 0);
+        int finalDamage = Mathf.Max(Mathf.RoundToInt(reducedDamage * (1f - resistance) * breakBonus * guardReduction), 0);
 
         _currentHP = Mathf.Max(_currentHP - finalDamage, 0);
         OnHPChanged?.Invoke(_currentHP, MaxHP);

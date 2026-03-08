@@ -19,6 +19,10 @@ public static class SampleDataGenerator
     private const string CAL_DIR       = "Assets/Data/CalendarEvents";
     private const string ENEMY_DIR     = "Assets/Data/Enemies";
     private const string FURNITURE_DIR = "Assets/Data/Furniture";
+    private const string DISH_DIR      = "Assets/Data/Dishes";
+    private const string RECIPE_DIR    = "Assets/Data/Recipes";
+    private const string QUALITY_DIR   = "Assets/Data";
+    private const string MATERIAL_DIR  = "Assets/Data/Materials";
 
     [MenuItem("DevilsDiner/Generate Sample Staff && Calendar Data")]
     public static void Generate()
@@ -41,6 +45,15 @@ public static class SampleDataGenerator
 
         // ── EnemyData に StaffRace 紐付け ──
         WireEnemyRaces(races);
+
+        // ── QualityScaleTable 生成 ──
+        var qualityTable = GenerateQualityScaleTable();
+
+        // ── DishData 生成 ──
+        var dishes = GenerateDishes(qualityTable);
+
+        // ── RecipeData 生成（新スキーマ）──
+        GenerateRecipes(dishes);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -310,6 +323,159 @@ public static class SampleDataGenerator
     }
 
     // ──────────────────────────────────────────────
+    // QualityScaleTable
+    // ──────────────────────────────────────────────
+
+    private static QualityScaleTable GenerateQualityScaleTable()
+    {
+        string path = $"{QUALITY_DIR}/QualityScaleTable.asset";
+        var existing = AssetDatabase.LoadAssetAtPath<QualityScaleTable>(path);
+        if (existing != null)
+        {
+            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
+            return existing;
+        }
+
+        EnsureDirectory(QUALITY_DIR);
+        var asset = ScriptableObject.CreateInstance<QualityScaleTable>();
+        // デフォルトのコンストラクタで適切な倍率が設定済み
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[SampleDataGenerator] 生成: {path}");
+        return asset;
+    }
+
+    // ──────────────────────────────────────────────
+    // DishData
+    // ──────────────────────────────────────────────
+
+    private static DishData[] GenerateDishes(QualityScaleTable qualityTable)
+    {
+        EnsureDirectory(DISH_DIR);
+
+        var definitions = new[]
+        {
+            new DishDef("DISH_Steak",       "ステーキ",           "ジューシーな肉料理。攻撃力アップ。",
+                        DishCategory.Meat,   80, 0.15f, 3, 0.05f, 150, 60, 5f),
+            new DishDef("DISH_Salad",        "サラダ",             "新鮮な野菜サラダ。防御力アップ。",
+                        DishCategory.Salad,  40, 0.10f, 3, 0.03f, 80,  40, 3f),
+            new DishDef("DISH_Stew",         "シチュー",           "温かいシチュー。攻撃力アップ。",
+                        DishCategory.Meat,   60, 0.12f, 4, 0.04f, 200, 55, 6f),
+            new DishDef("DISH_DragonSteak",  "竜王のステーキ",     "最高級の一品。攻撃力大幅アップ。",
+                        DishCategory.Meat,  120, 0.25f, 5, 0.08f, 500, 90, 8f),
+            new DishDef("DISH_PoisonStew",   "毒蛇のシチュー",     "独特の風味のシチュー。速度アップ。",
+                        DishCategory.Fish,   70, 0.18f, 4, 0.06f, 350, 70, 7f),
+            new DishDef("DISH_Pudding",      "プリン",             "甘いデザート。毎ターンHP回復。",
+                        DishCategory.Dessert, 30, 0.08f, 5, 0.02f, 120, 65, 4f),
+        };
+
+        var results = new DishData[definitions.Length];
+        for (int i = 0; i < definitions.Length; i++)
+        {
+            results[i] = CreateDish(definitions[i], qualityTable);
+        }
+        return results;
+    }
+
+    private static DishData CreateDish(DishDef def, QualityScaleTable qualityTable)
+    {
+        string path = $"{DISH_DIR}/{def.Id}.asset";
+        var existing = AssetDatabase.LoadAssetAtPath<DishData>(path);
+        if (existing != null)
+        {
+            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
+            return existing;
+        }
+
+        var asset = ScriptableObject.CreateInstance<DishData>();
+        var so = new SerializedObject(asset);
+        // ItemData 基底フィールド
+        so.FindProperty("_itemID").stringValue = def.Id;
+        so.FindProperty("_displayName").stringValue = def.DisplayName;
+        so.FindProperty("_description").stringValue = def.Description;
+        so.FindProperty("_sellPrice").intValue = def.ShopPrice / 2;
+        // DishData 固有フィールド
+        so.FindProperty("_category").enumValueIndex = (int)def.Category;
+        so.FindProperty("_hpRecoveryAmount").intValue = def.HpRecovery;
+        so.FindProperty("_baseBuff").floatValue = def.BaseBuff;
+        so.FindProperty("_buffDurationTurns").intValue = def.BuffDuration;
+        so.FindProperty("_scoutBonus").floatValue = def.ScoutBonus;
+        so.FindProperty("_shopPrice").intValue = def.ShopPrice;
+        so.FindProperty("_baseSatisfaction").intValue = def.Satisfaction;
+        so.FindProperty("_servingTime").floatValue = def.ServingTime;
+        so.FindProperty("_qualityTable").objectReferenceValue = qualityTable;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[SampleDataGenerator] 生成: {path}");
+        return asset;
+    }
+
+    // ──────────────────────────────────────────────
+    // RecipeData（新スキーマ）
+    // ──────────────────────────────────────────────
+
+    private static void GenerateRecipes(DishData[] dishes)
+    {
+        EnsureDirectory(RECIPE_DIR);
+
+        // 素材アセットをロード
+        var matMeat = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Meat.asset");
+        var matVeg  = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Vegetable.asset");
+        var matScale = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Scale.asset");
+        var matBone  = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Bone.asset");
+
+        // dishes: 0=Steak, 1=Salad, 2=Stew, 3=DragonSteak, 4=PoisonStew, 5=Pudding
+        CreateRecipe("RCP_Steak",       "ステーキ",         "肉を焼いた定番料理。",
+                     dishes[0], new IngSlot[]{ new IngSlot(matMeat, 2) }, 1);
+        CreateRecipe("RCP_Salad",       "サラダ",           "新鮮な野菜のサラダ。",
+                     dishes[1], new IngSlot[]{ new IngSlot(matVeg, 2) }, 1);
+        CreateRecipe("RCP_Stew",        "シチュー",         "肉と野菜の煮込み。",
+                     dishes[2], new IngSlot[]{ new IngSlot(matMeat, 1), new IngSlot(matVeg, 1) }, 1);
+        CreateRecipe("RCP_DragonSteak", "竜王のステーキ",   "最上級の鱗付き肉ステーキ。",
+                     dishes[3], new IngSlot[]{ new IngSlot(matMeat, 3), new IngSlot(matScale, 1) }, 3);
+        CreateRecipe("RCP_PoisonStew",  "毒蛇のシチュー",   "毒素が旨味に変わる一品。",
+                     dishes[4], new IngSlot[]{ new IngSlot(matBone, 2), new IngSlot(matVeg, 2) }, 2);
+        CreateRecipe("RCP_Pudding",     "プリン",           "甘くて優しいデザート。",
+                     dishes[5], new IngSlot[]{ new IngSlot(matVeg, 1) }, 1);
+    }
+
+    private static void CreateRecipe(
+        string id, string displayName, string description,
+        DishData outputDish, IngSlot[] ingredients, int requiredChefLevel)
+    {
+        string path = $"{RECIPE_DIR}/{id}.asset";
+
+        // 既存の旧スキーマアセットを削除して新スキーマで再生成
+        var existing = AssetDatabase.LoadAssetAtPath<RecipeData>(path);
+        if (existing != null)
+        {
+            AssetDatabase.DeleteAsset(path);
+            Debug.Log($"[SampleDataGenerator] 旧レシピ削除: {path}");
+        }
+
+        var asset = ScriptableObject.CreateInstance<RecipeData>();
+        var so = new SerializedObject(asset);
+        so.FindProperty("_recipeID").stringValue = id;
+        so.FindProperty("_displayName").stringValue = displayName;
+        so.FindProperty("_description").stringValue = description;
+        so.FindProperty("_outputDish").objectReferenceValue = outputDish;
+        so.FindProperty("_requiredChefLevel").intValue = requiredChefLevel;
+
+        var ingProp = so.FindProperty("_ingredients");
+        ingProp.arraySize = ingredients.Length;
+        for (int i = 0; i < ingredients.Length; i++)
+        {
+            var element = ingProp.GetArrayElementAtIndex(i);
+            element.FindPropertyRelative("Ingredient").objectReferenceValue = ingredients[i].Data;
+            element.FindPropertyRelative("Amount").intValue = ingredients[i].Amount;
+        }
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[SampleDataGenerator] 生成: {path}");
+    }
+
+    // ──────────────────────────────────────────────
     // ヘルパー
     // ──────────────────────────────────────────────
 
@@ -374,6 +540,46 @@ public static class SampleDataGenerator
             MinBuff = minBuff;
             MaxBuff = maxBuff;
         }
+    }
+
+    private struct DishDef
+    {
+        public string Id;
+        public string DisplayName;
+        public string Description;
+        public DishCategory Category;
+        public int HpRecovery;
+        public float BaseBuff;
+        public int BuffDuration;
+        public float ScoutBonus;
+        public int ShopPrice;
+        public int Satisfaction;
+        public float ServingTime;
+
+        public DishDef(string id, string displayName, string description,
+                       DishCategory category, int hpRecovery, float baseBuff,
+                       int buffDuration, float scoutBonus, int shopPrice,
+                       int satisfaction, float servingTime)
+        {
+            Id = id;
+            DisplayName = displayName;
+            Description = description;
+            Category = category;
+            HpRecovery = hpRecovery;
+            BaseBuff = baseBuff;
+            BuffDuration = buffDuration;
+            ScoutBonus = scoutBonus;
+            ShopPrice = shopPrice;
+            Satisfaction = satisfaction;
+            ServingTime = servingTime;
+        }
+    }
+
+    private struct IngSlot
+    {
+        public IngredientData Data;
+        public int Amount;
+        public IngSlot(IngredientData data, int amount) { Data = data; Amount = amount; }
     }
 }
 #endif

@@ -49,10 +49,14 @@ public sealed class BaseSceneUI : MonoBehaviour
 
     // パネル参照
     private VisualElement _mainMenuPanel;
+    private VisualElement _mapSelectPanel;
     private VisualElement _cookingPanel;
     private VisualElement _equipmentPanel;
     private VisualElement _scoutPanel;
     private VisualElement _resultPanel;
+
+    // マップ選択用
+    private VisualElement _mapListContainer;
 
     // 調理用
     private VisualElement _cookingRecipeListContainer;
@@ -134,6 +138,7 @@ public sealed class BaseSceneUI : MonoBehaviour
         if (_root == null) return;
 
         BuildMainMenu();
+        BuildMapSelectPanel();
         BuildCookingPanel();
         BuildEquipmentPanel();
         BuildScoutPanel();
@@ -181,7 +186,7 @@ public sealed class BaseSceneUI : MonoBehaviour
         menuPanel.Add(_calendarLabel);
 
         // ボタン
-        menuPanel.Add(CreateMenuButton("出撃", "フィールドへ出発する", true, OnSortie));
+        menuPanel.Add(CreateMenuButton("出撃", "フィールドへ出発する", true, () => ShowPanel(_mapSelectPanel)));
         menuPanel.Add(CreateMenuButton("料理", "素材から料理を作る", true, () => ShowPanel(_cookingPanel)));
         menuPanel.Add(CreateMenuButton("装備", "武器やスキルを変更する", true, () => ShowPanel(_equipmentPanel)));
         menuPanel.Add(CreateMenuButton("スカウト管理", "雇用した悪魔を管理する", true, () => ShowPanel(_scoutPanel)));
@@ -192,6 +197,106 @@ public sealed class BaseSceneUI : MonoBehaviour
         _saveFeedbackLabel.style.color = ACCENT_COLOR;
         _saveFeedbackLabel.style.display = DisplayStyle.None;
         menuPanel.Add(_saveFeedbackLabel);
+    }
+
+    // ──────────────────────────────────────────────
+    // マップ選択パネル
+    // ──────────────────────────────────────────────
+
+    private void BuildMapSelectPanel()
+    {
+        _mapSelectPanel = CreateFullscreenPanel();
+        _root.Add(_mapSelectPanel);
+
+        var container = CreatePanelContainer(500);
+        _mapSelectPanel.Add(container);
+
+        container.Add(CreateTitle("出撃先を選択"));
+
+        _mapListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _mapListContainer.style.flexGrow = 1;
+        _mapListContainer.style.maxHeight = 400;
+        _mapListContainer.style.marginBottom = 16;
+        container.Add(_mapListContainer);
+
+        container.Add(CreateBackButton());
+    }
+
+    private void RefreshMapSelectPanel()
+    {
+        _mapListContainer.Clear();
+
+        MapData[] allMaps = Resources.LoadAll<MapData>("");
+        if (allMaps.Length == 0)
+        {
+            _mapListContainer.Add(CreateInfoLabel("利用可能なマップがありません。"));
+            return;
+        }
+
+        // RequiredShopLevel 順にソート
+        System.Array.Sort(allMaps, (a, b) => a.RequiredShopLevel.CompareTo(b.RequiredShopLevel));
+
+        foreach (var map in allMaps)
+        {
+            var card = CreateCardRow();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.alignItems = Align.Stretch;
+            card.style.paddingTop = 8;
+            card.style.paddingBottom = 8;
+
+            // 名前行
+            var nameRow = new VisualElement();
+            nameRow.style.flexDirection = FlexDirection.Row;
+            nameRow.style.justifyContent = Justify.SpaceBetween;
+            nameRow.style.marginBottom = 4;
+            card.Add(nameRow);
+
+            var nameLabel = new Label(map.MapName);
+            nameLabel.style.fontSize = 18;
+            nameLabel.style.color = BTN_TEXT_COLOR;
+            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            nameRow.Add(nameLabel);
+
+            var envLabel = new Label(map.Environment.ToString());
+            envLabel.style.fontSize = 12;
+            envLabel.style.color = INFO_COLOR;
+            nameRow.Add(envLabel);
+
+            // 説明行
+            if (!string.IsNullOrEmpty(map.Description))
+            {
+                var descLabel = new Label(map.Description);
+                descLabel.style.fontSize = 12;
+                descLabel.style.color = INFO_COLOR;
+                descLabel.style.marginBottom = 4;
+                card.Add(descLabel);
+            }
+
+            // 推奨レベル
+            var recLabel = new Label($"推奨Lv.{map.RecommendedLevel}");
+            recLabel.style.fontSize = 11;
+            recLabel.style.color = new Color(0.8f, 0.6f, 0.3f);
+            recLabel.style.marginBottom = 4;
+            card.Add(recLabel);
+
+            // 出撃ボタン
+            MapData capturedMap = map;
+            var sortieBtn = CreateActionButton("出撃", ACCENT_COLOR, () => OnSortieToMap(capturedMap));
+            sortieBtn.style.marginTop = 4;
+            card.Add(sortieBtn);
+
+            _mapListContainer.Add(card);
+        }
+    }
+
+    private void OnSortieToMap(MapData map)
+    {
+        Debug.Log($"[BaseSceneUI] 出撃！ {map.MapName} ({map.SceneName}) へ遷移します。");
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AdvancePhase();
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -311,7 +416,8 @@ public sealed class BaseSceneUI : MonoBehaviour
         panel.style.opacity = 0f;
         panel.schedule.Execute(() => panel.style.opacity = 1f).ExecuteLater(16);
 
-        if (panel == _cookingPanel) RefreshCookingPanel();
+        if (panel == _mapSelectPanel) RefreshMapSelectPanel();
+        else if (panel == _cookingPanel) RefreshCookingPanel();
         else if (panel == _equipmentPanel) RefreshEquipmentPanel();
         else if (panel == _scoutPanel) RefreshScoutPanel();
     }
@@ -319,6 +425,7 @@ public sealed class BaseSceneUI : MonoBehaviour
     private void HideAllPanels()
     {
         _mainMenuPanel.style.display = DisplayStyle.None;
+        _mapSelectPanel.style.display = DisplayStyle.None;
         _cookingPanel.style.display = DisplayStyle.None;
         _equipmentPanel.style.display = DisplayStyle.None;
         _scoutPanel.style.display = DisplayStyle.None;

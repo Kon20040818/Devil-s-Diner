@@ -13,6 +13,8 @@ public sealed class BaseSceneBootstrap : MonoBehaviour
 {
     private void Start()
     {
+        EnsureGameManagerExists();
+
         // カーソル解放（フィールドでロックされていた場合）
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -37,5 +39,17 @@ public sealed class BaseSceneBootstrap : MonoBehaviour
         }
 
         Debug.Log("[BaseSceneBootstrap] 拠点シーン結線完了。");
+    }
+
+    /// <summary>
+    /// 単独シーン再生時の開発用フォールバック。
+    /// BootScene を経由せずに直接 Play した場合に GameManager を自動生成する。
+    /// </summary>
+    private static void EnsureGameManagerExists()
+    {
+        if (GameManager.Instance != null) return;
+        var go = new GameObject("GameManager [Fallback]");
+        go.AddComponent<GameManager>();
+        Debug.LogWarning("[BaseSceneBootstrap] GameManager フォールバック生成。通常は BootScene から起動してください。");
     }
 }

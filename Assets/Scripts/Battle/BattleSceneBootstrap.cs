@@ -14,6 +14,7 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
 {
     private void Start()
     {
+        EnsureGameManagerExists();
         WireAndStartBattle();
     }
 
@@ -211,6 +212,17 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
             Debug.Log("[BattleSceneBootstrap] DynamicBattleUIController を初期化しました。");
         }
 
+        // ── BattleResultUI（リザルトUI）自動生成 ──
+        // NOTE: BattleResultController.Initialize() が FindFirstObjectByType<BattleResultUI>()
+        //       を呼ぶため、必ず resultController.Initialize() より前に生成する。
+        BattleResultUI resultUI = FindFirstObjectByType<BattleResultUI>();
+        if (resultUI == null)
+        {
+            var resultUIObj = new GameObject("BattleResultUI");
+            resultUI = resultUIObj.AddComponent<BattleResultUI>();
+            Debug.Log("[BattleSceneBootstrap] BattleResultUI を自動生成しました。");
+        }
+
         // ── BattleResultController（リザルト画面＋シーン遷移）自動生成・結線 ──
         BattleResultController resultController = gameObject.AddComponent<BattleResultController>();
         resultController.Initialize(battleManager);
@@ -227,5 +239,21 @@ public sealed class BattleSceneBootstrap : MonoBehaviour
         }
 
         Debug.Log("[BattleSceneBootstrap] BattleResultController を自動生成しました。");
+
+        // ── AudioManager イベント結線 ──
+        AudioEventConnector.WireBattle(battleManager);
+        Debug.Log("[BattleSceneBootstrap] AudioEventConnector.WireBattle() 結線完了。");
+    }
+
+    /// <summary>
+    /// 単独シーン再生時の開発用フォールバック。
+    /// BootScene を経由せずに直接 Play した場合に GameManager を自動生成する。
+    /// </summary>
+    private static void EnsureGameManagerExists()
+    {
+        if (GameManager.Instance != null) return;
+        var go = new GameObject("GameManager [Fallback]");
+        go.AddComponent<GameManager>();
+        Debug.LogWarning("[BattleSceneBootstrap] GameManager フォールバック生成。通常は BootScene から起動してください。");
     }
 }

@@ -85,19 +85,19 @@ public sealed class BattleResultController : MonoBehaviour
         if (isVictory)
         {
             yield return StartCoroutine(VictorySequence());
+
+            // 勝利時は自動遷移
+            yield return new WaitForSecondsRealtime(_resultDisplayDuration);
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.TransitionToScene(_returnSceneName);
+            }
         }
         else
         {
             yield return StartCoroutine(DefeatSequence());
-        }
-
-        // リザルト表示時間
-        yield return new WaitForSecondsRealtime(_resultDisplayDuration);
-
-        // シーン遷移
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.TransitionToScene(_returnSceneName);
+            // 敗北時はプレイヤーの選択待ち（帰還 or リトライ）
+            // DefeatSequence 内でボタンイベントにシーン遷移を委譲済み
         }
     }
 
@@ -203,9 +203,44 @@ public sealed class BattleResultController : MonoBehaviour
         if (_effectsUI != null)
             yield return _effectsUI.PlayDefeatEffect();
 
-        // リザルトUI表示
+        // リザルトUI表示 + ボタンイベント結線
         if (_resultUI != null)
+        {
+            _resultUI.OnReturnToBase += HandleReturnToBase;
+            _resultUI.OnRetry += HandleRetry;
             _resultUI.ShowDefeat();
+        }
+    }
+
+    private void HandleReturnToBase()
+    {
+        if (_resultUI != null)
+        {
+            _resultUI.OnReturnToBase -= HandleReturnToBase;
+            _resultUI.OnRetry -= HandleRetry;
+            _resultUI.Hide();
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TransitionToScene("BaseScene");
+        }
+    }
+
+    private void HandleRetry()
+    {
+        if (_resultUI != null)
+        {
+            _resultUI.OnReturnToBase -= HandleReturnToBase;
+            _resultUI.OnRetry -= HandleRetry;
+            _resultUI.Hide();
+        }
+
+        if (GameManager.Instance != null)
+        {
+            // 同じバトルシーンを再ロード（PendingBattleData はまだ残っている）
+            GameManager.Instance.TransitionToScene("BattleScene");
+        }
     }
 
     // ──────────────────────────────────────────────

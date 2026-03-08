@@ -69,7 +69,7 @@ public sealed class CookingManager : MonoBehaviour
 
         foreach (var recipe in allRecipes)
         {
-            if (recipe.RequiredChefLevel <= _chefLevel)
+            if (recipe.RequiredChefLevel <= ChefLevel)
             {
                 available.Add(recipe);
             }
@@ -86,7 +86,7 @@ public sealed class CookingManager : MonoBehaviour
     public bool CanCook(RecipeData recipe)
     {
         if (recipe == null || recipe.OutputDish == null) return false;
-        if (recipe.RequiredChefLevel > _chefLevel) return false;
+        if (recipe.RequiredChefLevel > ChefLevel) return false;
         if (GameManager.Instance == null) return false;
 
         var inventory = GameManager.Instance.Inventory;

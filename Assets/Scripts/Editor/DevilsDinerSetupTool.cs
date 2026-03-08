@@ -554,6 +554,10 @@ public static class DevilsDinerSetupTool
         var toggleButtons = GameObject.Find("ToggleButtons");
         if (toggleButtons != null) toggleButtons.SetActive(false);
 
+        // ── BattleResultUI 追加 ──
+        var resultUIObj = new GameObject("BattleResultUI");
+        resultUIObj.AddComponent<BattleResultUI>();
+
         Debug.Log("[DevilsDiner] MetaphorBattleUI (UI Toolkit) を構築しました。");
     }
 

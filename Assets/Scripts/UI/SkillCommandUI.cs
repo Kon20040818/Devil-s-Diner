@@ -481,6 +481,14 @@ public sealed class SkillCommandUI : MonoBehaviour
             }
             ConfirmCommand();
         }
+
+        // G キーでガード（ターゲット不要、即発動）
+        if (kb.gKey.wasPressedThisFrame)
+        {
+            Hide();
+            _battleManager.ExecutePlayerAction(
+                CharacterBattleController.ActionType.Guard, null);
+        }
     }
 
     // =============================================

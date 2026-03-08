@@ -16,6 +16,7 @@ public sealed class FieldSceneBootstrap : MonoBehaviour
 
     private void Start()
     {
+        EnsureGameManagerExists();
         WireFieldScene();
     }
 
@@ -105,5 +106,17 @@ public sealed class FieldSceneBootstrap : MonoBehaviour
         _returnAction.Enable();
 
         Debug.Log($"[FieldSceneBootstrap] フィールドシーン結線完了。プレイヤー: 1, 敵シンボル: {symbols.Length}体");
+    }
+
+    /// <summary>
+    /// 単独シーン再生時の開発用フォールバック。
+    /// BootScene を経由せずに直接 Play した場合に GameManager を自動生成する。
+    /// </summary>
+    private static void EnsureGameManagerExists()
+    {
+        if (GameManager.Instance != null) return;
+        var go = new GameObject("GameManager [Fallback]");
+        go.AddComponent<GameManager>();
+        Debug.LogWarning("[FieldSceneBootstrap] GameManager フォールバック生成。通常は BootScene から起動してください。");
     }
 }
