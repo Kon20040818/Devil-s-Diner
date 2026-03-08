@@ -19,10 +19,11 @@ public static class SampleDataGenerator
     private const string CAL_DIR       = "Assets/Data/CalendarEvents";
     private const string ENEMY_DIR     = "Assets/Data/Enemies";
     private const string FURNITURE_DIR = "Assets/Data/Furniture";
-    private const string DISH_DIR      = "Assets/Data/Dishes";
+    private const string DISH_DIR       = "Assets/Data/Dishes";
     private const string RECIPE_DIR    = "Assets/Data/Recipes";
     private const string QUALITY_DIR   = "Assets/Data";
     private const string MATERIAL_DIR  = "Assets/Data/Materials";
+    private const string INGREDIENT_DIR = "Assets/Data/Ingredients";
 
     [MenuItem("DevilsDiner/Generate Sample Staff && Calendar Data")]
     public static void Generate()
@@ -46,6 +47,9 @@ public static class SampleDataGenerator
         // ── EnemyData に StaffRace 紐付け ──
         WireEnemyRaces(races);
 
+        // ── IngredientData 生成（MAT_* を ING_* に移行）──
+        var ingredients = GenerateIngredients();
+
         // ── QualityScaleTable 生成 ──
         var qualityTable = GenerateQualityScaleTable();
 
@@ -53,7 +57,10 @@ public static class SampleDataGenerator
         var dishes = GenerateDishes(qualityTable);
 
         // ── RecipeData 生成（新スキーマ）──
-        GenerateRecipes(dishes);
+        GenerateRecipes(dishes, ingredients);
+
+        // ── EnemyData ドロップ枠に IngredientData を結線 ──
+        WireEnemyDrops(ingredients);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -323,6 +330,104 @@ public static class SampleDataGenerator
     }
 
     // ──────────────────────────────────────────────
+    // IngredientData（素材アイテム生成）
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    /// IngredientData アセットを生成する。
+    /// 旧 MaterialData (MAT_*) のパラメータを引き継ぎつつ、
+    /// ItemData ベースの IngredientData (ING_*) として再生成する。
+    /// </summary>
+    private static IngredientData[] GenerateIngredients()
+    {
+        EnsureDirectory(INGREDIENT_DIR);
+
+        var definitions = new[]
+        {
+            new IngDef("ING_Meat",      "生肉",     "新鮮な肉。ステーキやシチューに。",         1, 0.80f, 1.0f, 20),
+            new IngDef("ING_Vegetable", "野菜",     "みずみずしい野菜。サラダやシチューに。",   1, 0.90f, 0.8f, 15),
+            new IngDef("ING_Bone",      "骨",       "硬い骨。出汁を取れる珍しい素材。",         2, 0.60f, 1.2f, 30),
+            new IngDef("ING_Scale",     "鱗",       "竜の鱗。最高級の調味素材。",               3, 0.40f, 1.5f, 80),
+            new IngDef("ING_Poison",    "毒腺",     "毒蛇の毒腺。独特の風味を生み出す。",       3, 0.50f, 1.3f, 60),
+            new IngDef("ING_Herb",      "薬草",     "森に自生する薬草。デザートの隠し味に。",   2, 0.70f, 0.9f, 25),
+        };
+
+        var results = new IngredientData[definitions.Length];
+        for (int i = 0; i < definitions.Length; i++)
+        {
+            results[i] = CreateIngredient(definitions[i]);
+        }
+        return results;
+    }
+
+    private static IngredientData CreateIngredient(IngDef def)
+    {
+        string path = $"{INGREDIENT_DIR}/{def.Id}.asset";
+        var existing = AssetDatabase.LoadAssetAtPath<IngredientData>(path);
+        if (existing != null)
+        {
+            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
+            return existing;
+        }
+
+        var asset = ScriptableObject.CreateInstance<IngredientData>();
+        var so = new SerializedObject(asset);
+        // ItemData 基底フィールド
+        so.FindProperty("_itemID").stringValue = def.Id;
+        so.FindProperty("_displayName").stringValue = def.DisplayName;
+        so.FindProperty("_description").stringValue = def.Description;
+        so.FindProperty("_sellPrice").intValue = def.SellPrice;
+        // IngredientData 固有フィールド
+        so.FindProperty("_rarity").intValue = def.Rarity;
+        so.FindProperty("_dropRate").floatValue = def.DropRate;
+        so.FindProperty("_gaugeSpeedMultiplier").floatValue = def.GaugeSpeedMultiplier;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[SampleDataGenerator] 生成: {path}");
+        return asset;
+    }
+
+    // ──────────────────────────────────────────────
+    // EnemyData ドロップ結線
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    /// EnemyData の _dropItemNormal / _dropItemJust に IngredientData を結線する。
+    /// </summary>
+    private static void WireEnemyDrops(IngredientData[] ingredients)
+    {
+        // ingredients: 0=Meat, 1=Vegetable, 2=Bone, 3=Scale, 4=Poison, 5=Herb
+
+        var mapping = new (string enemyFile, int normalIdx, int justIdx)[]
+        {
+            ("ENM_Cactus",      1, 5),  // 通常: 野菜,     ジャスト: 薬草
+            ("ENM_Boss",        0, 2),  // 通常: 生肉,     ジャスト: 骨
+            ("ENM_DragonLord",  0, 3),  // 通常: 生肉,     ジャスト: 鱗
+            ("ENM_PoisonHydra", 2, 4),  // 通常: 骨,       ジャスト: 毒腺
+            ("ENM_Dummy",       1, 0),  // 通常: 野菜,     ジャスト: 生肉
+        };
+
+        foreach (var (enemyFile, normalIdx, justIdx) in mapping)
+        {
+            string enemyPath = $"{ENEMY_DIR}/{enemyFile}.asset";
+            var enemyData = AssetDatabase.LoadAssetAtPath<EnemyData>(enemyPath);
+            if (enemyData == null)
+            {
+                Debug.LogWarning($"[SampleDataGenerator] EnemyData が見つかりません: {enemyPath}");
+                continue;
+            }
+
+            var so = new SerializedObject(enemyData);
+            so.FindProperty("_dropItemNormal").objectReferenceValue = ingredients[normalIdx];
+            so.FindProperty("_dropItemJust").objectReferenceValue = ingredients[justIdx];
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(enemyData);
+            Debug.Log($"[SampleDataGenerator] {enemyFile} ドロップ結線: 通常={ingredients[normalIdx].DisplayName}, ジャスト={ingredients[justIdx].DisplayName}");
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // QualityScaleTable
     // ──────────────────────────────────────────────
 
@@ -414,29 +519,31 @@ public static class SampleDataGenerator
     // RecipeData（新スキーマ）
     // ──────────────────────────────────────────────
 
-    private static void GenerateRecipes(DishData[] dishes)
+    private static void GenerateRecipes(DishData[] dishes, IngredientData[] ingredients)
     {
         EnsureDirectory(RECIPE_DIR);
 
-        // 素材アセットをロード
-        var matMeat = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Meat.asset");
-        var matVeg  = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Vegetable.asset");
-        var matScale = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Scale.asset");
-        var matBone  = AssetDatabase.LoadAssetAtPath<IngredientData>($"{MATERIAL_DIR}/MAT_Bone.asset");
+        // ingredients: 0=Meat, 1=Vegetable, 2=Bone, 3=Scale, 4=Poison, 5=Herb
+        var meat = ingredients[0];
+        var veg  = ingredients[1];
+        var bone = ingredients[2];
+        var scale = ingredients[3];
+        var poison = ingredients[4];
+        var herb = ingredients[5];
 
         // dishes: 0=Steak, 1=Salad, 2=Stew, 3=DragonSteak, 4=PoisonStew, 5=Pudding
         CreateRecipe("RCP_Steak",       "ステーキ",         "肉を焼いた定番料理。",
-                     dishes[0], new IngSlot[]{ new IngSlot(matMeat, 2) }, 1);
+                     dishes[0], new IngSlot[]{ new IngSlot(meat, 2) }, 1);
         CreateRecipe("RCP_Salad",       "サラダ",           "新鮮な野菜のサラダ。",
-                     dishes[1], new IngSlot[]{ new IngSlot(matVeg, 2) }, 1);
+                     dishes[1], new IngSlot[]{ new IngSlot(veg, 2) }, 1);
         CreateRecipe("RCP_Stew",        "シチュー",         "肉と野菜の煮込み。",
-                     dishes[2], new IngSlot[]{ new IngSlot(matMeat, 1), new IngSlot(matVeg, 1) }, 1);
+                     dishes[2], new IngSlot[]{ new IngSlot(meat, 1), new IngSlot(veg, 1) }, 1);
         CreateRecipe("RCP_DragonSteak", "竜王のステーキ",   "最上級の鱗付き肉ステーキ。",
-                     dishes[3], new IngSlot[]{ new IngSlot(matMeat, 3), new IngSlot(matScale, 1) }, 3);
+                     dishes[3], new IngSlot[]{ new IngSlot(meat, 3), new IngSlot(scale, 1) }, 3);
         CreateRecipe("RCP_PoisonStew",  "毒蛇のシチュー",   "毒素が旨味に変わる一品。",
-                     dishes[4], new IngSlot[]{ new IngSlot(matBone, 2), new IngSlot(matVeg, 2) }, 2);
+                     dishes[4], new IngSlot[]{ new IngSlot(bone, 2), new IngSlot(poison, 1) }, 2);
         CreateRecipe("RCP_Pudding",     "プリン",           "甘くて優しいデザート。",
-                     dishes[5], new IngSlot[]{ new IngSlot(matVeg, 1) }, 1);
+                     dishes[5], new IngSlot[]{ new IngSlot(veg, 1), new IngSlot(herb, 1) }, 1);
     }
 
     private static void CreateRecipe(
@@ -580,6 +687,29 @@ public static class SampleDataGenerator
         public IngredientData Data;
         public int Amount;
         public IngSlot(IngredientData data, int amount) { Data = data; Amount = amount; }
+    }
+
+    private struct IngDef
+    {
+        public string Id;
+        public string DisplayName;
+        public string Description;
+        public int Rarity;
+        public float DropRate;
+        public float GaugeSpeedMultiplier;
+        public int SellPrice;
+
+        public IngDef(string id, string displayName, string description,
+                      int rarity, float dropRate, float gaugeSpeedMultiplier, int sellPrice)
+        {
+            Id = id;
+            DisplayName = displayName;
+            Description = description;
+            Rarity = rarity;
+            DropRate = dropRate;
+            GaugeSpeedMultiplier = gaugeSpeedMultiplier;
+            SellPrice = sellPrice;
+        }
     }
 }
 #endif
