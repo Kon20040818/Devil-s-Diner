@@ -22,6 +22,7 @@ public sealed class GameManager : MonoBehaviour
     // 定数
     // ──────────────────────────────────────────────
     private const string BOOT_SCENE    = "BootScene";
+    private const string BASE_SCENE    = "BaseScene";
     private const string FIELD_SCENE   = "FieldScene";
     private const float  DEFAULT_FIXED_DELTA_TIME = 0.02f; // 50 Hz
     private const int    STARTING_GOLD = 500;
@@ -212,6 +213,8 @@ public sealed class GameManager : MonoBehaviour
                     SaveData.Save();
                     Debug.Log("[GameManager] フェーズ遷移 (Noon → Morning) で自動セーブ実行。");
                 }
+
+                LoadSceneAsync(BASE_SCENE);
                 break;
 
             default:

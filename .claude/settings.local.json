@@ -39,7 +39,9 @@
       "Read(//c/Users/kirll/**)",
       "Read(//c/Users/kirll/Devil''s Diner/Assets/Scripts/**)",
       "Bash(python3 -c \":*)",
-      "Bash(python -c \"import pathlib; p = pathlib.Path\\(r''c:/Users/kirll/Devil\\\\''s Diner/Assets/Scripts/UI/DynamicBattleUIController.cs''\\); t = p.read_text\\(encoding=''utf-8''\\); print\\(''count:'', t.count\\(''\\\\\\\\u2191''\\)\\)\")"
+      "Bash(python -c \"import pathlib; p = pathlib.Path\\(r''c:/Users/kirll/Devil\\\\''s Diner/Assets/Scripts/UI/DynamicBattleUIController.cs''\\); t = p.read_text\\(encoding=''utf-8''\\); print\\(''count:'', t.count\\(''\\\\\\\\u2191''\\)\\)\")",
+      "Bash(where uvx)",
+      "Bash(claude mcp add --scope user --transport stdio coplay-mcp --env MCP_TOOL_TIMEOUT=720000 -- uvx --python \">=3.11\" coplay-mcp-server@latest)"
     ],
     "additionalDirectories": [
       "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts",
@@ -47,7 +49,8 @@
       "c:\\Users\\kirll\\Devil''s Diner\\Assets",
       "c:\\Users\\kirll\\Devil''s Diner\\Assets\\Scripts\\UI",
       "c:\\Users\\kirll\\Devil''''s Diner\\Assets\\Scripts\\UI",
-      "c:\\Users\\kirll\\Devil''s Diner"
+      "c:\\Users\\kirll\\Devil''s Diner",
+      "C:\\Users\\kirll"
     ]
   }
 }
