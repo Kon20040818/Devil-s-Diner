@@ -14,10 +14,11 @@ using UnityEngine;
 /// </summary>
 public static class SampleDataGenerator
 {
-    private const string BUFF_DIR   = "Assets/Data/StaffBuffs";
-    private const string RACE_DIR   = "Assets/Data/StaffRaces";
-    private const string CAL_DIR    = "Assets/Data/CalendarEvents";
-    private const string ENEMY_DIR  = "Assets/Data/Enemies";
+    private const string BUFF_DIR      = "Assets/Data/StaffBuffs";
+    private const string RACE_DIR      = "Assets/Data/StaffRaces";
+    private const string CAL_DIR       = "Assets/Data/CalendarEvents";
+    private const string ENEMY_DIR     = "Assets/Data/Enemies";
+    private const string FURNITURE_DIR = "Assets/Data/Furniture";
 
     [MenuItem("DevilsDiner/Generate Sample Staff && Calendar Data")]
     public static void Generate()
@@ -34,6 +35,9 @@ public static class SampleDataGenerator
 
         // ── CalendarEventData 生成 ──
         GenerateCalendarEvents();
+
+        // ── FurnitureData 生成 ──
+        GenerateFurniture();
 
         // ── EnemyData に StaffRace 紐付け ──
         WireEnemyRaces(races);
@@ -214,6 +218,49 @@ public static class SampleDataGenerator
         so.FindProperty("_bonusCategory").enumValueIndex = (int)category;
         so.FindProperty("_satisfactionMultiplier").floatValue = satisfactionMul;
         so.FindProperty("_freshnessMultiplier").floatValue = freshnessMul;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[SampleDataGenerator] 生成: {path}");
+    }
+
+    // ──────────────────────────────────────────────
+    // FurnitureData
+    // ──────────────────────────────────────────────
+
+    private static void GenerateFurniture()
+    {
+        EnsureDirectory(FURNITURE_DIR);
+
+        CreateFurniture("FRN_Table",          "テーブルセット",   "席を増やして来客数アップ",
+                        FurnitureData.FurnitureType.Table, 200, 0.1f, 1);
+        CreateFurniture("FRN_Decoration",     "装飾品",           "おしゃれな内装で満足度アップ",
+                        FurnitureData.FurnitureType.Decoration, 500, 0.2f, 0);
+        CreateFurniture("FRN_KitchenUpgrade", "厨房改修",         "設備一新で大幅ボーナス",
+                        FurnitureData.FurnitureType.Kitchen, 1000, 0.3f, 2);
+    }
+
+    private static void CreateFurniture(
+        string id, string furnitureName, string desc,
+        FurnitureData.FurnitureType type, int price,
+        float satisfactionBonus, int customerBonus)
+    {
+        string path = $"{FURNITURE_DIR}/{id}.asset";
+        if (AssetDatabase.LoadAssetAtPath<FurnitureData>(path) != null)
+        {
+            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
+            return;
+        }
+
+        var asset = ScriptableObject.CreateInstance<FurnitureData>();
+        var so = new SerializedObject(asset);
+        so.FindProperty("_id").stringValue = id;
+        so.FindProperty("_furnitureName").stringValue = furnitureName;
+        so.FindProperty("_description").stringValue = desc;
+        so.FindProperty("_type").enumValueIndex = (int)type;
+        so.FindProperty("_price").intValue = price;
+        so.FindProperty("_satisfactionBonus").floatValue = satisfactionBonus;
+        so.FindProperty("_customerBonus").intValue = customerBonus;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         AssetDatabase.CreateAsset(asset, path);

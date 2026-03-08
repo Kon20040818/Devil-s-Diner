@@ -60,7 +60,14 @@ public sealed class DinerService : MonoBehaviour
         int totalRevenue = 0;
         int totalTips = 0;
         float totalSatisfaction = 0f;
-        int customersServed = _baseCustomerCount;
+
+        // 評判による客数ボーナス
+        int reputationBonus = GameManager.Instance != null ? GameManager.Instance.Reputation / 50 : 0;
+
+        // 家具による客数ボーナス
+        int furnitureCustomerBonus = GameManager.Instance?.Housing?.GetTotalCustomerBonus() ?? 0;
+
+        int customersServed = _baseCustomerCount + reputationBonus + furnitureCustomerBonus;
 
         // 各客に対しランダムにメニューからオーダー
         for (int i = 0; i < customersServed; i++)
@@ -87,9 +94,13 @@ public sealed class DinerService : MonoBehaviour
 
         // ゴールド加算
         int totalEarnings = result.TotalRevenue + result.TotalTips;
-        if (GameManager.Instance != null && totalEarnings > 0)
+        if (GameManager.Instance != null)
         {
-            GameManager.Instance.AddGold(totalEarnings);
+            if (totalEarnings > 0)
+                GameManager.Instance.AddGold(totalEarnings);
+
+            // 評判蓄積
+            GameManager.Instance.AddReputation(result.ReputationChange);
         }
 
         // メニューの料理をインベントリから消費
@@ -123,8 +134,9 @@ public sealed class DinerService : MonoBehaviour
     {
         float baseSatisfaction = dish.Satisfaction;
 
-        // スタッフバフ
-        float staffMultiplier = 1f + staffBuffs.SatisfactionBonus;
+        // スタッフバフ + 家具ボーナス
+        float furnitureSatBonus = GameManager.Instance?.Housing?.GetTotalSatisfactionBonus() ?? 0f;
+        float staffMultiplier = 1f + staffBuffs.SatisfactionBonus + furnitureSatBonus;
 
         // カレンダーボーナス
         float calendarMultiplier = 1f;

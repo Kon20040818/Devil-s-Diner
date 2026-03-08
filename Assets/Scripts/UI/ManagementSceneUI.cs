@@ -7,6 +7,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using System.Linq;
 
 /// <summary>
 /// 経営シーンの UI メニューを構築・管理するコンポーネント。
@@ -65,6 +66,10 @@ public sealed class ManagementSceneUI : MonoBehaviour
     private VisualElement _cookingRecipeListContainer;
     private Label _cookingInfoLabel;
 
+    // 店舗改装用
+    private VisualElement _furnitureListContainer;
+    private Label _furnitureInfoLabel;
+
     // 従業員配置用
     private VisualElement _staffListContainer;
 
@@ -74,6 +79,7 @@ public sealed class ManagementSceneUI : MonoBehaviour
 
     // メインメニュー情報
     private Label _infoLabel;
+    private Label _calendarLabel;
 
     // ──────────────────────────────────────────────
     // 初期化
@@ -84,7 +90,26 @@ public sealed class ManagementSceneUI : MonoBehaviour
     {
         _cookingMgr = cookingMgr;
         _dinerService = dinerService;
+
+        // GameManager イベント購読（ゴールド/日数変動でメニュー情報を自動更新）
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGoldChanged += HandleGoldChanged;
+            GameManager.Instance.OnDayAdvanced += HandleDayAdvanced;
+        }
     }
+
+    private void OnDestroy()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGoldChanged -= HandleGoldChanged;
+            GameManager.Instance.OnDayAdvanced -= HandleDayAdvanced;
+        }
+    }
+
+    private void HandleGoldChanged(int _) => RefreshMainMenuInfo();
+    private void HandleDayAdvanced(int _) => RefreshMainMenuInfo();
 
     // ──────────────────────────────────────────────
     // Lifecycle
@@ -152,13 +177,20 @@ public sealed class ManagementSceneUI : MonoBehaviour
         string dayText = GameManager.Instance != null ? $"Day {GameManager.Instance.CurrentDay}" : "Day 1";
         string goldText = GameManager.Instance != null ? $"{GameManager.Instance.Gold} G" : "500 G";
         _infoLabel = CreateInfoLabel($"{dayText}  |  {goldText}");
-        _infoLabel.style.marginBottom = 24;
+        _infoLabel.style.marginBottom = 4;
         menuPanel.Add(_infoLabel);
+
+        // カレンダーイベント
+        _calendarLabel = CreateInfoLabel("イベント：なし");
+        _calendarLabel.style.fontSize = 13;
+        _calendarLabel.style.color = ACCENT_COLOR;
+        _calendarLabel.style.marginBottom = 20;
+        menuPanel.Add(_calendarLabel);
 
         // ボタン
         menuPanel.Add(CreateMenuButton("店舗運営", "お客さんに料理を提供する", true, () => ShowPanel(_dinerOperationsPanel)));
         menuPanel.Add(CreateMenuButton("メニュー編成", "レシピから料理を調理する", true, () => ShowPanel(_menuCompositionPanel)));
-        menuPanel.Add(CreateMenuButton("店舗改装", "店の設備を拡張する", false, null));
+        menuPanel.Add(CreateMenuButton("店舗改装", "店の設備を拡張する", true, () => ShowPanel(_shopExpansionPanel)));
         menuPanel.Add(CreateMenuButton("従業員配置", "スカウトした悪魔を配置する", true, () => ShowPanel(_staffPlacementPanel)));
 
         // スペーサー
@@ -185,10 +217,10 @@ public sealed class ManagementSceneUI : MonoBehaviour
         container.Add(CreateTitle("店舗運営"));
         container.Add(CreateInfoLabel("提供する料理を選んで営業を開始しましょう"));
 
-        // 料理リスト
-        _dinerDishListContainer = new VisualElement();
+        // 料理リスト（ScrollView）
+        _dinerDishListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _dinerDishListContainer.style.flexGrow = 1;
         _dinerDishListContainer.style.maxHeight = 300;
-        _dinerDishListContainer.style.overflow = Overflow.Hidden;
         _dinerDishListContainer.style.marginBottom = 16;
         container.Add(_dinerDishListContainer);
 
@@ -214,9 +246,9 @@ public sealed class ManagementSceneUI : MonoBehaviour
         _cookingInfoLabel = CreateInfoLabel("レシピを選んで調理しましょう");
         container.Add(_cookingInfoLabel);
 
-        _cookingRecipeListContainer = new VisualElement();
+        _cookingRecipeListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _cookingRecipeListContainer.style.flexGrow = 1;
         _cookingRecipeListContainer.style.maxHeight = 350;
-        _cookingRecipeListContainer.style.overflow = Overflow.Hidden;
         _cookingRecipeListContainer.style.marginBottom = 16;
         container.Add(_cookingRecipeListContainer);
 
@@ -232,16 +264,19 @@ public sealed class ManagementSceneUI : MonoBehaviour
         _shopExpansionPanel = CreateFullscreenPanel();
         _root.Add(_shopExpansionPanel);
 
-        var container = CreatePanelContainer(400);
+        var container = CreatePanelContainer(500);
         _shopExpansionPanel.Add(container);
 
         container.Add(CreateTitle("店舗改装"));
 
-        var comingSoon = CreateInfoLabel("Coming Soon...");
-        comingSoon.style.fontSize = 24;
-        comingSoon.style.marginTop = 40;
-        comingSoon.style.marginBottom = 40;
-        container.Add(comingSoon);
+        _furnitureInfoLabel = CreateInfoLabel("家具を購入して店舗をグレードアップ！");
+        container.Add(_furnitureInfoLabel);
+
+        _furnitureListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _furnitureListContainer.style.flexGrow = 1;
+        _furnitureListContainer.style.maxHeight = 350;
+        _furnitureListContainer.style.marginBottom = 16;
+        container.Add(_furnitureListContainer);
 
         container.Add(CreateBackButton());
     }
@@ -260,9 +295,9 @@ public sealed class ManagementSceneUI : MonoBehaviour
 
         container.Add(CreateTitle("従業員配置"));
 
-        _staffListContainer = new VisualElement();
+        _staffListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _staffListContainer.style.flexGrow = 1;
         _staffListContainer.style.maxHeight = 400;
-        _staffListContainer.style.overflow = Overflow.Hidden;
         _staffListContainer.style.marginBottom = 16;
         container.Add(_staffListContainer);
 
@@ -308,9 +343,12 @@ public sealed class ManagementSceneUI : MonoBehaviour
     {
         HideAllPanels();
         panel.style.display = DisplayStyle.Flex;
+        panel.style.opacity = 0f;
+        panel.schedule.Execute(() => panel.style.opacity = 1f).ExecuteLater(16);
 
         if (panel == _dinerOperationsPanel) RefreshDinerPanel();
         else if (panel == _menuCompositionPanel) RefreshCookingPanel();
+        else if (panel == _shopExpansionPanel) RefreshFurniturePanel();
         else if (panel == _staffPlacementPanel) RefreshStaffPanel();
     }
 
@@ -339,7 +377,15 @@ public sealed class ManagementSceneUI : MonoBehaviour
     private void RefreshMainMenuInfo()
     {
         if (_infoLabel == null || GameManager.Instance == null) return;
-        _infoLabel.text = $"Day {GameManager.Instance.CurrentDay}  |  {GameManager.Instance.Gold} G";
+        _infoLabel.text = $"Day {GameManager.Instance.CurrentDay}  |  {GameManager.Instance.Gold} G  |  評判: {GameManager.Instance.Reputation}";
+
+        if (_calendarLabel != null)
+        {
+            var calEvent = FindActiveCalendarEvent();
+            _calendarLabel.text = calEvent != null
+                ? $"イベント：{calEvent.EventName}（接客×{calEvent.SatisfactionMultiplier:F1} / 鮮度×{calEvent.FreshnessMultiplier:F1}）"
+                : "イベント：なし";
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -431,7 +477,15 @@ public sealed class ManagementSceneUI : MonoBehaviour
         }
 
         var recipes = _cookingMgr.GetAvailableRecipes();
-        _cookingInfoLabel.text = $"シェフLv.{_cookingMgr.ChefLevel}  |  利用可能レシピ: {recipes.Count}件";
+        string xpInfo = "";
+        if (GameManager.Instance != null)
+        {
+            int nextThreshold = GameManager.Instance.GetNextLevelThreshold();
+            xpInfo = nextThreshold > 0
+                ? $"  ({GameManager.Instance.CookingXP}/{nextThreshold} XP)"
+                : "  (MAX)";
+        }
+        _cookingInfoLabel.text = $"シェフLv.{_cookingMgr.ChefLevel}{xpInfo}  |  レシピ: {recipes.Count}件";
 
         if (recipes.Count == 0)
         {
@@ -523,6 +577,115 @@ public sealed class ManagementSceneUI : MonoBehaviour
         else
         {
             ShowResult("調理失敗", $"{recipe.DisplayName} の調理条件を満たしていません。");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // 店舗改装ロジック
+    // ──────────────────────────────────────────────
+
+    private void RefreshFurniturePanel()
+    {
+        _furnitureListContainer.Clear();
+
+        if (GameManager.Instance == null || GameManager.Instance.Housing == null)
+        {
+            _furnitureInfoLabel.text = "HousingManager が未初期化です。";
+            return;
+        }
+
+        var housing = GameManager.Instance.Housing;
+
+        // ボーナス情報
+        float satBonus = housing.GetTotalSatisfactionBonus();
+        int custBonus = housing.GetTotalCustomerBonus();
+        _furnitureInfoLabel.text = $"合計ボーナス — 接客: +{satBonus:P0}  客数: +{custBonus}";
+
+        // 全家具を表示
+        FurnitureData[] allFurniture = Resources.LoadAll<FurnitureData>("");
+        if (allFurniture.Length == 0)
+        {
+            _furnitureListContainer.Add(CreateInfoLabel("家具データがありません。"));
+            return;
+        }
+
+        foreach (var furniture in allFurniture)
+        {
+            if (furniture == null) continue;
+
+            var card = CreateCardRow();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.alignItems = Align.Stretch;
+            card.style.paddingTop = 8;
+            card.style.paddingBottom = 8;
+
+            // 名前行
+            var nameRow = new VisualElement();
+            nameRow.style.flexDirection = FlexDirection.Row;
+            nameRow.style.justifyContent = Justify.SpaceBetween;
+            nameRow.style.marginBottom = 4;
+            card.Add(nameRow);
+
+            var nameLabel = new Label(furniture.FurnitureName);
+            nameLabel.style.fontSize = 16;
+            nameLabel.style.color = BTN_TEXT_COLOR;
+            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            nameRow.Add(nameLabel);
+
+            var priceLabel = new Label($"{furniture.Price} G");
+            priceLabel.style.fontSize = 14;
+            priceLabel.style.color = INFO_COLOR;
+            nameRow.Add(priceLabel);
+
+            // 効果
+            string effect = "";
+            if (furniture.SatisfactionBonus > 0f) effect += $"接客+{furniture.SatisfactionBonus:P0} ";
+            if (furniture.CustomerBonus > 0) effect += $"客数+{furniture.CustomerBonus}";
+            if (!string.IsNullOrEmpty(effect))
+            {
+                var effectLabel = new Label(effect.Trim());
+                effectLabel.style.fontSize = 12;
+                effectLabel.style.color = ACCENT_COLOR;
+                effectLabel.style.marginBottom = 4;
+                card.Add(effectLabel);
+            }
+
+            // 説明
+            if (!string.IsNullOrEmpty(furniture.Description))
+            {
+                var descLabel = new Label(furniture.Description);
+                descLabel.style.fontSize = 11;
+                descLabel.style.color = INFO_COLOR;
+                descLabel.style.marginBottom = 4;
+                card.Add(descLabel);
+            }
+
+            // ボタン
+            bool owned = housing.Owns(furniture);
+            if (owned)
+            {
+                var ownedLabel = new Label("設置済");
+                ownedLabel.style.fontSize = 13;
+                ownedLabel.style.color = ACCENT_COLOR;
+                ownedLabel.style.unityTextAlign = TextAnchor.MiddleRight;
+                card.Add(ownedLabel);
+            }
+            else
+            {
+                bool canBuy = GameManager.Instance.CanAfford(furniture.Price);
+                FurnitureData captured = furniture;
+                var buyBtn = CreateSmallButton(canBuy ? "購入" : "所持金不足",
+                    canBuy ? ACCENT_COLOR : DISABLED_TEXT_COLOR,
+                    canBuy ? () =>
+                    {
+                        housing.TryBuyFurniture(captured);
+                        RefreshFurniturePanel();
+                    } : (System.Action)null);
+                if (!canBuy) buyBtn.SetEnabled(false);
+                card.Add(buyBtn);
+            }
+
+            _furnitureListContainer.Add(card);
         }
     }
 
@@ -711,6 +874,9 @@ public sealed class ManagementSceneUI : MonoBehaviour
         panel.style.alignItems = Align.Center;
         panel.style.justifyContent = Justify.Center;
         panel.style.display = DisplayStyle.None;
+        // opacity フェード用トランジション設定
+        panel.style.transitionProperty = new List<StylePropertyName> { new StylePropertyName("opacity") };
+        panel.style.transitionDuration = new List<TimeValue> { new TimeValue(200, TimeUnit.Millisecond) };
         return panel;
     }
 

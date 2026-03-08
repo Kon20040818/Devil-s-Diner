@@ -58,6 +58,10 @@ public sealed class BaseSceneUI : MonoBehaviour
     private VisualElement _cookingRecipeListContainer;
     private Label _cookingInfoLabel;
 
+    // 装備用
+    private VisualElement _equipmentListContainer;
+    private Label _equipmentInfoLabel;
+
     // スカウト管理用
     private VisualElement _scoutListContainer;
 
@@ -68,6 +72,9 @@ public sealed class BaseSceneUI : MonoBehaviour
     // セーブフィードバック用
     private Label _saveFeedbackLabel;
 
+    // カレンダーイベント
+    private Label _calendarLabel;
+
     // ──────────────────────────────────────────────
     // 初期化
     // ──────────────────────────────────────────────
@@ -76,7 +83,26 @@ public sealed class BaseSceneUI : MonoBehaviour
     public void Initialize(CookingManager cookingMgr)
     {
         _cookingMgr = cookingMgr;
+
+        // GameManager イベント購読
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGoldChanged += HandleGoldChanged;
+            GameManager.Instance.OnDayAdvanced += HandleDayAdvanced;
+        }
     }
+
+    private void OnDestroy()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGoldChanged -= HandleGoldChanged;
+            GameManager.Instance.OnDayAdvanced -= HandleDayAdvanced;
+        }
+    }
+
+    private void HandleGoldChanged(int _) => RefreshMainMenuInfo();
+    private void HandleDayAdvanced(int _) => RefreshMainMenuInfo();
 
     // ──────────────────────────────────────────────
     // Lifecycle
@@ -144,13 +170,20 @@ public sealed class BaseSceneUI : MonoBehaviour
         string dayText = GameManager.Instance != null ? $"Day {GameManager.Instance.CurrentDay}" : "Day 1";
         string goldText = GameManager.Instance != null ? $"{GameManager.Instance.Gold} G" : "500 G";
         _infoLabel = CreateInfoLabel($"{dayText}  |  {goldText}");
-        _infoLabel.style.marginBottom = 24;
+        _infoLabel.style.marginBottom = 4;
         menuPanel.Add(_infoLabel);
+
+        // カレンダーイベント
+        _calendarLabel = CreateInfoLabel("イベント：なし");
+        _calendarLabel.style.fontSize = 13;
+        _calendarLabel.style.color = ACCENT_COLOR;
+        _calendarLabel.style.marginBottom = 20;
+        menuPanel.Add(_calendarLabel);
 
         // ボタン
         menuPanel.Add(CreateMenuButton("出撃", "フィールドへ出発する", true, OnSortie));
         menuPanel.Add(CreateMenuButton("料理", "素材から料理を作る", true, () => ShowPanel(_cookingPanel)));
-        menuPanel.Add(CreateMenuButton("装備", "武器やスキルを変更する", false, null));
+        menuPanel.Add(CreateMenuButton("装備", "武器やスキルを変更する", true, () => ShowPanel(_equipmentPanel)));
         menuPanel.Add(CreateMenuButton("スカウト管理", "雇用した悪魔を管理する", true, () => ShowPanel(_scoutPanel)));
         menuPanel.Add(CreateSaveButton());
 
@@ -178,9 +211,9 @@ public sealed class BaseSceneUI : MonoBehaviour
         _cookingInfoLabel = CreateInfoLabel("レシピを選んで調理しましょう");
         container.Add(_cookingInfoLabel);
 
-        _cookingRecipeListContainer = new VisualElement();
+        _cookingRecipeListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _cookingRecipeListContainer.style.flexGrow = 1;
         _cookingRecipeListContainer.style.maxHeight = 350;
-        _cookingRecipeListContainer.style.overflow = Overflow.Hidden;
         _cookingRecipeListContainer.style.marginBottom = 16;
         container.Add(_cookingRecipeListContainer);
 
@@ -196,16 +229,19 @@ public sealed class BaseSceneUI : MonoBehaviour
         _equipmentPanel = CreateFullscreenPanel();
         _root.Add(_equipmentPanel);
 
-        var container = CreatePanelContainer(400);
+        var container = CreatePanelContainer(500);
         _equipmentPanel.Add(container);
 
         container.Add(CreateTitle("装備"));
 
-        var comingSoon = CreateInfoLabel("Coming Soon...");
-        comingSoon.style.fontSize = 24;
-        comingSoon.style.marginTop = 40;
-        comingSoon.style.marginBottom = 40;
-        container.Add(comingSoon);
+        _equipmentInfoLabel = CreateInfoLabel("武器を選んで装備しましょう");
+        container.Add(_equipmentInfoLabel);
+
+        _equipmentListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _equipmentListContainer.style.flexGrow = 1;
+        _equipmentListContainer.style.maxHeight = 350;
+        _equipmentListContainer.style.marginBottom = 16;
+        container.Add(_equipmentListContainer);
 
         container.Add(CreateBackButton());
     }
@@ -224,9 +260,9 @@ public sealed class BaseSceneUI : MonoBehaviour
 
         container.Add(CreateTitle("スカウト管理"));
 
-        _scoutListContainer = new VisualElement();
+        _scoutListContainer = new ScrollView(ScrollViewMode.Vertical);
+        _scoutListContainer.style.flexGrow = 1;
         _scoutListContainer.style.maxHeight = 400;
-        _scoutListContainer.style.overflow = Overflow.Hidden;
         _scoutListContainer.style.marginBottom = 16;
         container.Add(_scoutListContainer);
 
@@ -272,8 +308,11 @@ public sealed class BaseSceneUI : MonoBehaviour
     {
         HideAllPanels();
         panel.style.display = DisplayStyle.Flex;
+        panel.style.opacity = 0f;
+        panel.schedule.Execute(() => panel.style.opacity = 1f).ExecuteLater(16);
 
         if (panel == _cookingPanel) RefreshCookingPanel();
+        else if (panel == _equipmentPanel) RefreshEquipmentPanel();
         else if (panel == _scoutPanel) RefreshScoutPanel();
     }
 
@@ -301,7 +340,15 @@ public sealed class BaseSceneUI : MonoBehaviour
     private void RefreshMainMenuInfo()
     {
         if (_infoLabel == null || GameManager.Instance == null) return;
-        _infoLabel.text = $"Day {GameManager.Instance.CurrentDay}  |  {GameManager.Instance.Gold} G";
+        _infoLabel.text = $"Day {GameManager.Instance.CurrentDay}  |  {GameManager.Instance.Gold} G  |  評判: {GameManager.Instance.Reputation}";
+
+        if (_calendarLabel != null)
+        {
+            var calEvent = FindActiveCalendarEvent();
+            _calendarLabel.text = calEvent != null
+                ? $"イベント：{calEvent.EventName}（接客×{calEvent.SatisfactionMultiplier:F1} / 鮮度×{calEvent.FreshnessMultiplier:F1}）"
+                : "イベント：なし";
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -319,7 +366,15 @@ public sealed class BaseSceneUI : MonoBehaviour
         }
 
         var recipes = _cookingMgr.GetAvailableRecipes();
-        _cookingInfoLabel.text = $"シェフLv.{_cookingMgr.ChefLevel}  |  利用可能レシピ: {recipes.Count}件";
+        string xpInfo = "";
+        if (GameManager.Instance != null)
+        {
+            int nextThreshold = GameManager.Instance.GetNextLevelThreshold();
+            xpInfo = nextThreshold > 0
+                ? $"  ({GameManager.Instance.CookingXP}/{nextThreshold} XP)"
+                : "  (MAX)";
+        }
+        _cookingInfoLabel.text = $"シェフLv.{_cookingMgr.ChefLevel}{xpInfo}  |  レシピ: {recipes.Count}件";
 
         if (recipes.Count == 0)
         {
@@ -411,6 +466,108 @@ public sealed class BaseSceneUI : MonoBehaviour
         else
         {
             ShowResult("調理失敗", $"{recipe.DisplayName} の調理条件を満たしていません。");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // 装備ロジック
+    // ──────────────────────────────────────────────
+
+    private void RefreshEquipmentPanel()
+    {
+        _equipmentListContainer.Clear();
+
+        if (GameManager.Instance == null)
+        {
+            _equipmentInfoLabel.text = "GameManager が未初期化です。";
+            return;
+        }
+
+        string equippedID = GameManager.Instance.EquippedWeaponID;
+        var equippedWeapon = GameManager.Instance.GetEquippedWeapon();
+        _equipmentInfoLabel.text = equippedWeapon != null
+            ? $"装備中: {equippedWeapon.DisplayName} (攻撃+{equippedWeapon.BaseDamage})"
+            : "装備中: なし";
+
+        // インベントリから武器を列挙
+        var allItems = GameManager.Instance.Inventory.GetAllItems();
+        bool hasWeapon = false;
+
+        foreach (var kvp in allItems)
+        {
+            if (kvp.Key is not WeaponData weapon) continue;
+            hasWeapon = true;
+
+            bool isEquipped = weapon.ItemID == equippedID;
+
+            var card = CreateCardRow();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.alignItems = Align.Stretch;
+            card.style.paddingTop = 8;
+            card.style.paddingBottom = 8;
+            if (isEquipped) card.style.borderLeftColor = ACCENT_COLOR;
+            if (isEquipped) card.style.borderLeftWidth = 3;
+
+            // 名前行
+            var nameRow = new VisualElement();
+            nameRow.style.flexDirection = FlexDirection.Row;
+            nameRow.style.justifyContent = Justify.SpaceBetween;
+            nameRow.style.marginBottom = 4;
+            card.Add(nameRow);
+
+            var nameLabel = new Label(weapon.DisplayName);
+            nameLabel.style.fontSize = 16;
+            nameLabel.style.color = isEquipped ? ACCENT_COLOR : BTN_TEXT_COLOR;
+            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            nameRow.Add(nameLabel);
+
+            if (isEquipped)
+            {
+                var equippedLabel = new Label("装備中");
+                equippedLabel.style.fontSize = 12;
+                equippedLabel.style.color = ACCENT_COLOR;
+                nameRow.Add(equippedLabel);
+            }
+
+            // ステータス
+            var statsRow = new VisualElement();
+            statsRow.style.flexDirection = FlexDirection.Row;
+            statsRow.style.marginBottom = 4;
+            card.Add(statsRow);
+
+            var dmgLabel = new Label($"攻撃力+{weapon.BaseDamage}");
+            dmgLabel.style.fontSize = 12;
+            dmgLabel.style.color = INFO_COLOR;
+            dmgLabel.style.marginRight = 12;
+            statsRow.Add(dmgLabel);
+
+            if (weapon.JustInputFrameBonus > 0)
+            {
+                var justLabel = new Label($"ジャスト補正+{weapon.JustInputFrameBonus}F");
+                justLabel.style.fontSize = 12;
+                justLabel.style.color = INFO_COLOR;
+                statsRow.Add(justLabel);
+            }
+
+            // 装備ボタン（未装備の場合）
+            if (!isEquipped)
+            {
+                WeaponData captured = weapon;
+                var equipBtn = CreateActionButton("装備する", ACCENT_COLOR, () =>
+                {
+                    GameManager.Instance.EquipWeapon(captured.ItemID);
+                    RefreshEquipmentPanel();
+                });
+                equipBtn.style.marginTop = 4;
+                card.Add(equipBtn);
+            }
+
+            _equipmentListContainer.Add(card);
+        }
+
+        if (!hasWeapon)
+        {
+            _equipmentListContainer.Add(CreateInfoLabel("武器がインベントリにありません。\nフィールドで武器を入手しましょう。"));
         }
     }
 
@@ -568,6 +725,9 @@ public sealed class BaseSceneUI : MonoBehaviour
         panel.style.alignItems = Align.Center;
         panel.style.justifyContent = Justify.Center;
         panel.style.display = DisplayStyle.None;
+        // opacity フェード用トランジション設定
+        panel.style.transitionProperty = new System.Collections.Generic.List<StylePropertyName> { new StylePropertyName("opacity") };
+        panel.style.transitionDuration = new System.Collections.Generic.List<TimeValue> { new TimeValue(200, TimeUnit.Millisecond) };
         return panel;
     }
 
@@ -816,6 +976,24 @@ public sealed class BaseSceneUI : MonoBehaviour
         row.style.borderLeftColor = BORDER_COLOR;
         row.style.borderRightColor = BORDER_COLOR;
         return row;
+    }
+
+    // ──────────────────────────────────────────────
+    // カレンダーイベント検索
+    // ──────────────────────────────────────────────
+
+    private CalendarEventData FindActiveCalendarEvent()
+    {
+        if (GameManager.Instance == null) return null;
+
+        int day = GameManager.Instance.CurrentDay;
+        CalendarEventData[] allEvents = Resources.LoadAll<CalendarEventData>("");
+        foreach (var evt in allEvents)
+        {
+            if (evt != null && evt.IsActiveOnDay(day))
+                return evt;
+        }
+        return null;
     }
 
     // ──────────────────────────────────────────────

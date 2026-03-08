@@ -335,7 +335,8 @@ public sealed class CharacterBattleController : MonoBehaviour
     public int CalculateBasicAttackDamage()
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
-        return Mathf.RoundToInt(baseDmg * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
     }
 
     /// <summary>スキル攻撃のダメージ値を計算する。</summary>
@@ -343,7 +344,8 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
         float mult = _stats != null ? _stats.SkillMultiplier : 1.5f;
-        return Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
     }
 
     /// <summary>必殺技のダメージ値を計算する。</summary>
@@ -351,7 +353,16 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
         float mult = _stats != null ? _stats.UltimateMultiplier : 3.0f;
-        return Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
+    }
+
+    /// <summary>装備武器のダメージボーナスを返す（味方のみ）。</summary>
+    private int GetWeaponBonus()
+    {
+        if (_faction != Faction.Player) return 0;
+        var weapon = GameManager.Instance?.GetEquippedWeapon();
+        return weapon != null ? weapon.BaseDamage : 0;
     }
 
     /// <summary>指定アクションのダメージ値を返す。</summary>

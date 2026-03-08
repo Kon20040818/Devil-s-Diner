@@ -15,6 +15,9 @@ using UnityEngine.InputSystem;
 /// F4: 手動セーブ
 /// F5: 手動ロード
 /// F6: セーブ/ロード往復テスト
+/// F7: バトル勝利シミュレート（鮮度バフ + ダミーリクルート）
+/// F8: 料理シミュレート（最初の利用可能レシピで調理）
+/// F9: ManagementScene へ強制遷移
 /// </summary>
 public sealed class DebugController : MonoBehaviour
 {
@@ -59,6 +62,21 @@ public sealed class DebugController : MonoBehaviour
         if (kb.f6Key.wasPressedThisFrame)
         {
             VerifySaveLoadRoundTrip();
+        }
+
+        if (kb.f7Key.wasPressedThisFrame)
+        {
+            SimulateBattleVictory();
+        }
+
+        if (kb.f8Key.wasPressedThisFrame)
+        {
+            SimulateCooking();
+        }
+
+        if (kb.f9Key.wasPressedThisFrame)
+        {
+            JumpToManagementScene();
         }
     }
 
@@ -222,5 +240,80 @@ public sealed class DebugController : MonoBehaviour
             Debug.Log("[DebugController] F6: セーブ/ロード往復テスト — 全データ一致！ SUCCESS");
         else
             Debug.LogWarning("[DebugController] F6: セーブ/ロード往復テスト — 不一致あり FAILED");
+    }
+
+    private void SimulateBattleVictory()
+    {
+        GameManager gm = GameManager.Instance;
+        if (gm == null)
+        {
+            Debug.LogWarning("[DebugController] F7: GameManager が見つかりません。");
+            return;
+        }
+
+        // 鮮度バフをセット
+        gm.DailyFreshnessBuff = 1.5f;
+
+        // ダミーリクルートを作成してスタッフマネージャーに送る
+        if (gm.Staff != null)
+        {
+            var dummyRecruit = new RecruitedDemonData
+            {
+                EnemyName = "Debug_Demon",
+                Stats = null,
+                Race = null,
+                RolledBuffs = new StaffBuffData[0]
+            };
+            gm.Staff.ReceiveRecruits(new List<RecruitedDemonData> { dummyRecruit });
+            Debug.Log("[DebugController] F7: バトル勝利をシミュレート (鮮度×1.5, ダミーリクルート1体)");
+        }
+        else
+        {
+            Debug.Log("[DebugController] F7: バトル勝利をシミュレート (鮮度×1.5, StaffManager未初期化のためリクルートなし)");
+        }
+    }
+
+    private void SimulateCooking()
+    {
+        var cookMgr = FindFirstObjectByType<CookingManager>();
+        if (cookMgr == null)
+        {
+            cookMgr = new GameObject("CookingManager").AddComponent<CookingManager>();
+            Debug.Log("[DebugController] F8: CookingManager を仮生成しました。");
+        }
+
+        var recipes = cookMgr.GetAvailableRecipes();
+        if (recipes.Count == 0)
+        {
+            Debug.LogWarning("[DebugController] F8: 利用可能なレシピがありません。素材が不足している可能性があります。");
+            return;
+        }
+
+        RecipeData recipe = recipes[0];
+        if (!cookMgr.CanCook(recipe))
+        {
+            Debug.LogWarning($"[DebugController] F8: {recipe.DisplayName} の素材が不足しています。");
+            return;
+        }
+
+        float freshness = GameManager.Instance != null ? GameManager.Instance.DailyFreshnessBuff : 1f;
+        var result = cookMgr.Cook(recipe, freshness);
+        if (result.Success)
+            Debug.Log($"[DebugController] F8: {recipe.DisplayName} を調理 → 品質: {result.Dish.Quality}");
+        else
+            Debug.LogWarning($"[DebugController] F8: {recipe.DisplayName} の調理に失敗しました。");
+    }
+
+    private void JumpToManagementScene()
+    {
+        GameManager gm = GameManager.Instance;
+        if (gm == null)
+        {
+            Debug.LogWarning("[DebugController] F9: GameManager が見つかりません。");
+            return;
+        }
+
+        gm.TransitionToScene("ManagementScene");
+        Debug.Log("[DebugController] F9: ManagementScene へ強制遷移");
     }
 }

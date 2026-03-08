@@ -50,10 +50,10 @@ public sealed class CookingManager : MonoBehaviour
 
     private int _chefLevel = 1;
 
-    /// <summary>現在のシェフレベル。</summary>
+    /// <summary>現在のシェフレベル。GameManager 存在時はそちらを参照する。</summary>
     public int ChefLevel
     {
-        get => _chefLevel;
+        get => GameManager.Instance != null ? GameManager.Instance.ChefLevel : _chefLevel;
         set => _chefLevel = Mathf.Max(1, value);
     }
 
@@ -146,6 +146,15 @@ public sealed class CookingManager : MonoBehaviour
         result.Success = true;
 
         Debug.Log($"[CookingManager] {recipe.DisplayName} 調理完了 → {quality} (スコア: {qualityScore:F2})");
+
+        // 調理経験値を付与
+        if (GameManager.Instance != null)
+        {
+            int xpGain = recipe.RequiredChefLevel * 20;
+            if (quality == DishQuality.Fine) xpGain += 10;
+            else if (quality == DishQuality.Exquisite) xpGain += 25;
+            GameManager.Instance.AddCookingXP(xpGain);
+        }
 
         OnDishCooked?.Invoke(result);
         return result;

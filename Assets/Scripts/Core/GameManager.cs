@@ -123,11 +123,115 @@ public sealed class GameManager : MonoBehaviour
     public StaffManager Staff { get; private set; }
 
     // ──────────────────────────────────────────────
+    // HousingManager 参照
+    // ──────────────────────────────────────────────
+
+    /// <summary>家具管理。GameManager と同じ GameObject にアタッチ。</summary>
+    public HousingManager Housing { get; private set; }
+
+    // ──────────────────────────────────────────────
+    // シェフレベル / 調理経験値
+    // ──────────────────────────────────────────────
+
+    /// <summary>レベルアップに必要な累計 XP 閾値。</summary>
+    private static readonly int[] LEVEL_THRESHOLDS = { 0, 100, 300, 600, 1000, 1500 };
+
+    /// <summary>現在の調理経験値。</summary>
+    public int CookingXP { get; private set; } = 0;
+
+    /// <summary>現在のシェフレベル（1始まり）。</summary>
+    public int ChefLevel { get; private set; } = 1;
+
+    /// <summary>シェフレベルが上がったとき。引数は新レベル。</summary>
+    public event Action<int> OnChefLevelUp;
+
+    /// <summary>調理経験値を加算し、レベルアップ判定を行う。</summary>
+    public void AddCookingXP(int xp)
+    {
+        CookingXP += xp;
+        int newLevel = 1;
+        for (int i = LEVEL_THRESHOLDS.Length - 1; i >= 0; i--)
+        {
+            if (CookingXP >= LEVEL_THRESHOLDS[i]) { newLevel = i + 1; break; }
+        }
+        if (newLevel > ChefLevel)
+        {
+            ChefLevel = newLevel;
+            OnChefLevelUp?.Invoke(ChefLevel);
+            Debug.Log($"[GameManager] シェフレベルアップ！ Lv.{ChefLevel}");
+        }
+    }
+
+    /// <summary>セーブデータ復元用。外部からシェフレベルを設定する。</summary>
+    public void SetChefLevel(int lv) { ChefLevel = Mathf.Max(1, lv); }
+
+    /// <summary>セーブデータ復元用。外部から調理経験値を設定する。</summary>
+    public void SetCookingXP(int xp) { CookingXP = xp; }
+
+    /// <summary>次のレベルアップまでに必要な XP 閾値を返す。最大レベルなら -1。</summary>
+    public int GetNextLevelThreshold()
+    {
+        if (ChefLevel >= LEVEL_THRESHOLDS.Length) return -1;
+        return LEVEL_THRESHOLDS[ChefLevel];
+    }
+
+    // ──────────────────────────────────────────────
+    // 評判
+    // ──────────────────────────────────────────────
+
+    /// <summary>店舗の評判値。DinerService の営業結果で増減する。</summary>
+    public int Reputation { get; private set; } = 0;
+
+    /// <summary>評判変動時イベント。引数は変動後の評判値。</summary>
+    public event Action<int> OnReputationChanged;
+
+    /// <summary>評判を加算する（負値で減算可能）。0 未満にはならない。</summary>
+    public void AddReputation(int amount)
+    {
+        Reputation = Mathf.Max(0, Reputation + amount);
+        OnReputationChanged?.Invoke(Reputation);
+    }
+
+    /// <summary>セーブデータ復元用。外部から評判を設定する。</summary>
+    public void SetReputation(int rep) { Reputation = rep; }
+
+    // ──────────────────────────────────────────────
     // 鮮度バフ（バトル成績由来）
     // ──────────────────────────────────────────────
 
     /// <summary>当日の鮮度バフ。BattleResult から書き込まれ、CookingManager が参照する。</summary>
     public float DailyFreshnessBuff { get; set; } = 1f;
+
+    // ──────────────────────────────────────────────
+    // 装備武器
+    // ──────────────────────────────────────────────
+
+    /// <summary>装備中の武器の ItemID。空文字は未装備。</summary>
+    public string EquippedWeaponID { get; private set; } = "";
+
+    /// <summary>武器を装備する。</summary>
+    public void EquipWeapon(string weaponItemID)
+    {
+        EquippedWeaponID = weaponItemID ?? "";
+        Debug.Log($"[GameManager] 武器装備: {(string.IsNullOrEmpty(EquippedWeaponID) ? "なし" : EquippedWeaponID)}");
+    }
+
+    /// <summary>セーブデータ復元用。</summary>
+    public void SetEquippedWeaponID(string id) { EquippedWeaponID = id ?? ""; }
+
+    /// <summary>装備中の WeaponData を返す。未装備なら null。</summary>
+    public WeaponData GetEquippedWeapon()
+    {
+        if (string.IsNullOrEmpty(EquippedWeaponID)) return null;
+
+        // インベントリ内のアイテムから検索
+        foreach (var kvp in Inventory.GetAllItems())
+        {
+            if (kvp.Key is WeaponData weapon && weapon.ItemID == EquippedWeaponID)
+                return weapon;
+        }
+        return null;
+    }
 
     // ──────────────────────────────────────────────
     // Lifecycle
@@ -171,6 +275,13 @@ public sealed class GameManager : MonoBehaviour
             staffMgr = gameObject.AddComponent<StaffManager>();
         }
         Staff = staffMgr;
+
+        // HousingManager を追加
+        if (!TryGetComponent(out HousingManager housingMgr))
+        {
+            housingMgr = gameObject.AddComponent<HousingManager>();
+        }
+        Housing = housingMgr;
 
         // AudioManager を追加
         if (!TryGetComponent(out AudioManager _audioMgr))
@@ -309,9 +420,14 @@ public sealed class GameManager : MonoBehaviour
         CurrentDay   = STARTING_DAY;
         CurrentPhase = GamePhase.Morning;
         Gold         = STARTING_GOLD;
+        Reputation   = 0;
+        ChefLevel    = 1;
+        CookingXP    = 0;
         DailyFreshnessBuff = 1f;
+        EquippedWeaponID = "";
         Inventory.ClearAll();
         Staff?.ClearAll();
+        Housing?.ClearAll();
     }
 
     // ──────────────────────────────────────────────

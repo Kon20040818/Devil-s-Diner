@@ -25,6 +25,14 @@ public sealed class SaveDataManager : MonoBehaviour
         public int CurrentDay;
         public int Gold;
         public int ChefLevel = 1;
+        public int Reputation;
+        public int CookingXP;
+
+        /// <summary>所有家具の ID リスト。</summary>
+        public List<string> OwnedFurniture;
+
+        /// <summary>装備中の武器 ItemID。</summary>
+        public string EquippedWeaponID;
 
         /// <summary>全アイテム共通エントリ。</summary>
         public List<ItemEntry> Items;
@@ -96,6 +104,7 @@ public sealed class SaveDataManager : MonoBehaviour
         {
             CurrentDay = gm.CurrentDay,
             Gold       = gm.Gold,
+            Reputation = gm.Reputation,
             Items      = new List<SaveData.ItemEntry>(),
             PermanentStaff = new List<SaveData.StaffEntry>()
         };
@@ -145,12 +154,18 @@ public sealed class SaveDataManager : MonoBehaviour
             }
         }
 
-        // シェフレベルを保存
-        var cookingMgr = FindFirstObjectByType<CookingManager>();
-        if (cookingMgr != null)
+        // シェフレベル・経験値を保存
+        saveData.ChefLevel = gm.ChefLevel;
+        saveData.CookingXP = gm.CookingXP;
+
+        // 家具を保存
+        if (gm.Housing != null)
         {
-            saveData.ChefLevel = cookingMgr.ChefLevel;
+            saveData.OwnedFurniture = gm.Housing.GetOwnedIDs();
         }
+
+        // 装備武器を保存
+        saveData.EquippedWeaponID = gm.EquippedWeaponID;
 
         string json = JsonUtility.ToJson(saveData, true);
         File.WriteAllText(FilePath, json);
@@ -190,6 +205,18 @@ public sealed class SaveDataManager : MonoBehaviour
         // ── 基本パラメータ復元 ──
         gm.SetCurrentDay(saveData.CurrentDay);
         gm.SetGold(saveData.Gold);
+        gm.SetReputation(saveData.Reputation);
+        gm.SetChefLevel(saveData.ChefLevel);
+        gm.SetCookingXP(saveData.CookingXP);
+
+        // ── 装備武器復元 ──
+        gm.SetEquippedWeaponID(saveData.EquippedWeaponID);
+
+        // ── 家具復元 ──
+        if (gm.Housing != null && saveData.OwnedFurniture != null)
+        {
+            gm.Housing.RestoreOwned(saveData.OwnedFurniture);
+        }
 
         // ── インベントリクリア ──
         gm.Inventory.ClearAll();
