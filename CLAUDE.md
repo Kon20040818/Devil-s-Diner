@@ -9,14 +9,27 @@
 ## Directory Structure
 ```text
 Assets/
-  Scenes/          # Unity scenes
+  MasterData/      # CSV / JSON マスターデータ (インポート元)
+  Resources/Data/  # ScriptableObject アセット (MasterDataImporter が自動生成)
+    Ingredients/   # IngredientData
+    Dishes/        # DishData
+    Recipes/       # RecipeData
+    Furniture/     # FurnitureData
+    Characters/    # CharacterStats
+    Enemies/       # EnemyData
+    Weapons/       # WeaponData
+    StaffBuffs/    # StaffBuffData
+    StaffRaces/    # StaffRaceData
+    CalendarEvents/# CalendarEventData
+  Scenes/          # Unity scenes (Boot/Base/Field/Battle/Management)
   Scripts/         # All C# game scripts
     Action/        # (Legacy/Action components)
     Battle/        # Timeline/Turn-based battle core (BattleManager, Actions, etc.)
-    Core/          # GameManager, InventoryManager, Data Loaders
-    Data/          # ScriptableObjects (Materials, Weapons, Enemies, etc.)
-    Editor/        # Editor-only scripts (CustomEditor, Setup tools, etc.)
-    Management/    # Diner simulation components
+    Core/          # GameManager, InventoryManager, Data Loaders, BootLoader
+    Data/          # ScriptableObject class definitions
+    Editor/        # Editor-only scripts (MasterDataImporter, Setup tools, etc.)
+    Field/         # Field exploration & scene bootstraps
+    Management/    # Diner simulation components (CookingManager, StaffManager, etc.)
     UI/            # Modern UI Toolkit (BattleUI, TimelineUI, Menus, Metaphor-style)
   Settings/        # Unity Render Pipeline / project settings assets
   Prefabs/         # Reusable prefabs
@@ -24,7 +37,7 @@ Assets/
   Textures/        # Sprites, UI textures, etc.
   Audio/           # SE and BGM
   Animations/      # Animation clips and controllers
-  UI/              # UI Toolkit (UXML/USS) or Canvas-based UI assets
+  UI/              # UI Toolkit (UXML/USS) assets
 ```
 
 ## Coding Conventions
@@ -105,6 +118,55 @@ Before suggesting any new implementation or refactoring, AI must **NEVER code ba
   Control over UI elements (Command Menus, Status, Timeline, etc.) is handled via **event-driven integration** through central managers like `BattleUIManager`. Individual scripts must not directly manipulate `UIDocument`. Do not mix UI manipulation and data logic (like HP reduction) within the same class.
 - **Master/Persistent Data Management**:
   Static data ("Materials", "Dishes", "Enemy Stats") must not be hardcoded. Always use **`ScriptableObject`s** (under `Data/`). Persistent data carried across sessions (Gold, Inventory) is managed centrally by single data containers like `GameManager`. Scenes must only reference these containers.
+
+## 📦 5. Data Pipeline (MasterDataImporter)
+
+All game data follows a **CSV/JSON → ScriptableObject** pipeline:
+
+- **Source files**: `Assets/MasterData/` (CSV or JSON)
+- **Generated assets**: `Assets/Resources/Data/<Type>/` (ScriptableObject)
+- **Importer**: `Assets/Scripts/Editor/MasterDataImporter.cs` — menu `DevilsDiner > Import Master Data (CSV and JSON)`
+- **Wrapper**: `Assets/Scripts/Editor/SampleDataGenerator.cs` — menu `DevilsDiner > Generate All Master Data`
+
+### Conventions
+- **CSV** for flat data (ingredients, dishes, weapons, staff_buffs, calendar_events, characters, enemies, furniture)
+- **JSON** for data with nested arrays/object references (recipes, staff_races)
+- **Array fields in CSV**: use semicolon `;` delimiter (e.g., `WeakElements` = `"Fire;Ice"`, `TriggerDays` = `"3;10;17"`)
+- **Cross-references**: use string IDs in CSV/JSON, resolved via `BuildLookup<T>()` at import time
+- **Import order matters**: Dependencies must be imported first (e.g., StaffBuffs before StaffRaces, Ingredients before Enemies)
+- **Adding new data types**: Add CSV/JSON file, add `Import<Type>()` method, add to `ImportAll()` in correct order
+- **ID convention**: `PREFIX_Name` (e.g., `ING_Beef`, `DISH_Steak`, `RCP_Steak`, `RACE_Boss`, `SBUF_QualityUp`)
+- **SerializedObject pattern**: Use `SerializedObject` + `FindProperty()` to write to `[SerializeField]` private fields in Editor scripts
+
+### Current Master Data Files (10 files)
+| File | Format | ScriptableObject | Count |
+|------|--------|-----------------|-------|
+| `ingredients.csv` | CSV | IngredientData | 12 |
+| `dishes.csv` | CSV | DishData | 30 |
+| `recipes.json` | JSON | RecipeData | 30 |
+| `furniture.csv` | CSV | FurnitureData | 3 |
+| `characters.csv` | CSV | CharacterStats | 1 |
+| `enemies.csv` | CSV | EnemyData | 5 |
+| `weapons.csv` | CSV | WeaponData | 6 |
+| `staff_buffs.csv` | CSV | StaffBuffData | 8 |
+| `staff_races.json` | JSON | StaffRaceData | 5 |
+| `calendar_events.csv` | CSV | CalendarEventData | 3 |
+
+## 🎬 6. Scene Architecture & Bootstrap Pattern
+
+### Game Flow
+```
+BootScene → BaseScene (朝) → FieldScene/BattleScene (昼) → ManagementScene (夕) → BaseScene (翌朝)
+```
+
+### Auto Setup Tools (Editor)
+Each scene has an auto-setup tool under `DevilsDiner >` menu:
+- `Auto Setup Boot Scene` — BootSceneAutoBuilder.cs
+- `Auto Setup Base Scene` / `Field Scene` / `Battle Scene` / `Management Scene` — DevilsDinerSetupTool.cs
+
+### Bootstrap Fallback
+Every scene has a Bootstrap component (`*SceneBootstrap.cs`) with `EnsureGameManagerExists()`.
+This allows single-scene Play in Editor without requiring BootScene. The fallback creates a temporary GameManager instance with a warning log.
 
 ## 🎮 3. Unity & C# Best Practices
 
