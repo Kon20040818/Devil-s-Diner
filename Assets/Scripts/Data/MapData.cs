@@ -49,7 +49,7 @@ public sealed class MapData : ScriptableObject
     [SerializeField] private int _recommendedLevel = 1;
 
     /// <summary>ロード対象のシーン名。</summary>
-    [SerializeField] private string _sceneName = "ActionScene";
+    [SerializeField] private string _sceneName = "FieldScene";
 
     // ──────────────────────────────────────────────
     // 公開プロパティ

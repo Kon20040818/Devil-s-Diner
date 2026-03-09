@@ -1,11 +1,17 @@
 // ============================================================
 // MaterialData.cs
-// 素材データの ScriptableObject。
+// 旧互換エイリアス。IngredientData への移行が完了するまで残す。
+// 新規コードでは IngredientData を直接使用すること。
 // ============================================================
+using System;
 using UnityEngine;
 
-/// <summary>素材データ。敵ドロップ、採集、購入で取得する。</summary>
-[CreateAssetMenu(fileName = "MAT_New", menuName = "DevilsDiner/MaterialData")]
+/// <summary>
+/// [Obsolete] IngredientData を使用してください。
+/// 旧コードとの互換性のために残しています。
+/// </summary>
+[Obsolete("MaterialData は廃止予定です。IngredientData を使用してください。")]
+[CreateAssetMenu(fileName = "MAT_New", menuName = "DevilsDiner/MaterialData (Legacy)")]
 public sealed class MaterialData : ScriptableObject
 {
     [SerializeField] private string _id;

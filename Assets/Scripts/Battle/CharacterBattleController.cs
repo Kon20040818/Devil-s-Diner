@@ -50,7 +50,10 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         BasicAttack,
         Skill,
-        Ultimate
+        Ultimate,
+        Meal,
+        Scout,
+        Guard
     }
 
     /// <summary>ダメージ結果を格納する構造体。UI表示に使用。</summary>
@@ -72,6 +75,9 @@ public sealed class CharacterBattleController : MonoBehaviour
     private int _currentEP;
     private int _currentToughness;
     private bool _isBroken;
+    private bool _isScouted;
+    private bool _isGuarding;
+    private EnemyData _enemyData;
 
     // ──────────────────────────────────────────────
     // プロパティ
@@ -118,6 +124,21 @@ public sealed class CharacterBattleController : MonoBehaviour
 
     /// <summary>靭性システムが有効か。</summary>
     public bool HasToughness => MaxToughness > 0;
+
+    /// <summary>スカウトによって雇用されたか。</summary>
+    public bool IsScouted => _isScouted;
+
+    /// <summary>ガード状態か。次にダメージを受けると解除され、ダメージが半減する。</summary>
+    public bool IsGuarding => _isGuarding;
+
+    /// <summary>ガード状態を設定する。</summary>
+    public void SetGuarding(bool value) => _isGuarding = value;
+
+    /// <summary>敵データ（ドロップ・ゴールド報酬用）。敵のみセット。</summary>
+    public EnemyData EnemyData => _enemyData;
+
+    /// <summary>敵データをセットする。BattleSceneBootstrapで呼ばれる。</summary>
+    public void SetEnemyData(EnemyData data) => _enemyData = data;
 
     // ──────────────────────────────────────────────
     // イベント
@@ -193,8 +214,17 @@ public sealed class CharacterBattleController : MonoBehaviour
         // 靭性破壊中はダメージ増加 (+25%)
         float breakBonus = _isBroken ? 1.25f : 1.0f;
 
+        // ガード中はダメージ半減（1回限り）
+        float guardReduction = 1.0f;
+        if (_isGuarding)
+        {
+            guardReduction = 0.5f;
+            _isGuarding = false;
+            Debug.Log($"[Battle] {DisplayName} はガードでダメージを軽減！");
+        }
+
         int reducedDamage = Mathf.Max(rawDamage - defense, 1);
-        int finalDamage = Mathf.Max(Mathf.RoundToInt(reducedDamage * (1f - resistance) * breakBonus), 0);
+        int finalDamage = Mathf.Max(Mathf.RoundToInt(reducedDamage * (1f - resistance) * breakBonus * guardReduction), 0);
 
         _currentHP = Mathf.Max(_currentHP - finalDamage, 0);
         OnHPChanged?.Invoke(_currentHP, MaxHP);
@@ -253,6 +283,20 @@ public sealed class CharacterBattleController : MonoBehaviour
         OnHPChanged?.Invoke(_currentHP, MaxHP);
     }
 
+    /// <summary>
+    /// スカウトによりバトルから除外する。
+    /// 通常の戦闘不能と異なりドロップ処理をスキップする。
+    /// </summary>
+    public void ScoutRemove()
+    {
+        _isScouted = true;
+        _currentHP = 0;
+        OnHPChanged?.Invoke(_currentHP, MaxHP);
+        SetState(BattleState.Down);
+        OnDeath?.Invoke(this);
+        Debug.Log($"[Battle] {DisplayName} はスカウトされてバトルから離脱した！");
+    }
+
     // ──────────────────────────────────────────────
     // EP管理
     // ──────────────────────────────────────────────
@@ -308,7 +352,8 @@ public sealed class CharacterBattleController : MonoBehaviour
     public int CalculateBasicAttackDamage()
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
-        return Mathf.RoundToInt(baseDmg * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
     }
 
     /// <summary>スキル攻撃のダメージ値を計算する。</summary>
@@ -316,7 +361,8 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
         float mult = _stats != null ? _stats.SkillMultiplier : 1.5f;
-        return Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
     }
 
     /// <summary>必殺技のダメージ値を計算する。</summary>
@@ -324,7 +370,16 @@ public sealed class CharacterBattleController : MonoBehaviour
     {
         int baseDmg = _stats != null ? _stats.Attack : 1;
         float mult = _stats != null ? _stats.UltimateMultiplier : 3.0f;
-        return Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        int result = Mathf.RoundToInt(baseDmg * mult * SkillEffectApplier.AttackMultiplier);
+        return result + GetWeaponBonus();
+    }
+
+    /// <summary>装備武器のダメージボーナスを返す（味方のみ）。</summary>
+    private int GetWeaponBonus()
+    {
+        if (_faction != Faction.Player) return 0;
+        var weapon = GameManager.Instance?.GetEquippedWeapon();
+        return weapon != null ? weapon.BaseDamage : 0;
     }
 
     /// <summary>指定アクションのダメージ値を返す。</summary>

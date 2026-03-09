@@ -238,22 +238,15 @@ public sealed class DamageNumberUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies four Outline components (one per diagonal) plus an outer glow layer
-    /// and a drop Shadow for a thick, readable border against any background.
+    /// Applies a single thick Outline plus a drop Shadow for readable text.
+    /// Kept minimal to avoid exceeding uGUI's 65000 vertex limit when
+    /// multiple damage numbers are displayed simultaneously.
     /// </summary>
     private static void ApplyOutlines(GameObject textObj)
     {
-        // Inner outlines -- four diagonals for a solid, uniform border.
+        // Single thick outline — covers all directions uniformly.
         AddOutline(textObj, new Vector2(OUTLINE_DISTANCE, OUTLINE_DISTANCE), OUTLINE_COLOR);
-        AddOutline(textObj, new Vector2(-OUTLINE_DISTANCE, OUTLINE_DISTANCE), OUTLINE_COLOR);
-        AddOutline(textObj, new Vector2(OUTLINE_DISTANCE, -OUTLINE_DISTANCE), OUTLINE_COLOR);
         AddOutline(textObj, new Vector2(-OUTLINE_DISTANCE, -OUTLINE_DISTANCE), OUTLINE_COLOR);
-
-        // Outer soft glow -- extends the silhouette further for readability.
-        AddOutline(textObj, new Vector2(OUTER_OUTLINE_DISTANCE, 0f), OUTER_OUTLINE_COLOR);
-        AddOutline(textObj, new Vector2(-OUTER_OUTLINE_DISTANCE, 0f), OUTER_OUTLINE_COLOR);
-        AddOutline(textObj, new Vector2(0f, OUTER_OUTLINE_DISTANCE), OUTER_OUTLINE_COLOR);
-        AddOutline(textObj, new Vector2(0f, -OUTER_OUTLINE_DISTANCE), OUTER_OUTLINE_COLOR);
 
         // Drop shadow for depth.
         var shadow = textObj.AddComponent<Shadow>();

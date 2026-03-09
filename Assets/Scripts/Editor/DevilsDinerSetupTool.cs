@@ -112,7 +112,7 @@ public static class DevilsDinerSetupTool
 
     private static void CreateScriptableObjects()
     {
-        CreateSOIfNotExists<MaterialData>("Assets/Data/Materials", "MAT_Dummy");
+        CreateSOIfNotExists<IngredientData>("Assets/Data/Ingredients", "ING_Dummy");
         CreateSOIfNotExists<WeaponData>("Assets/Data/Weapons", "WPN_Dummy");
         CreateSOIfNotExists<EnemyData>("Assets/Data/Enemies", "ENM_Dummy");
 
@@ -196,21 +196,7 @@ public static class DevilsDinerSetupTool
         battleSystemGO.AddComponent<BattleManager>();
         battleSystemGO.AddComponent<BattleSceneBootstrap>();
 
-        var camMgr = battleSystemGO.AddComponent<BattleCameraManager>();
-        var camMgrSO = new SerializedObject(camMgr);
-        camMgrSO.FindProperty("_overviewOffset").vector3Value = new Vector3(2.0f, 5.0f, -8.0f);
-        camMgrSO.FindProperty("_overviewLookOffset").vector3Value = new Vector3(0f, 1.0f, 2.0f);
-        camMgrSO.FindProperty("_followSpeed").floatValue = 5f;
-        camMgrSO.ApplyModifiedPropertiesWithoutUndo();
-
-        // ════════════════════════════════════════════════
-        // 2. Overview Position Marker
-        // ════════════════════════════════════════════════
-        var overviewMarker = new GameObject("OverviewPosition");
-        overviewMarker.transform.position = new Vector3(0f, 0f, 0f);
-        camMgrSO = new SerializedObject(camMgr);
-        camMgrSO.FindProperty("_overviewPosition").objectReferenceValue = overviewMarker.transform;
-        camMgrSO.ApplyModifiedPropertiesWithoutUndo();
+        // Note: BattleCameraManager is now generated entirely by BattleCameraSetupWindow.cs.
 
         // ════════════════════════════════════════════════
         // 3. Main Camera
@@ -275,6 +261,11 @@ public static class DevilsDinerSetupTool
         // 9. MetaphorBattleUI (UI Toolkit) — メタファー風UI
         // ════════════════════════════════════════════════
         CreateMetaphorBattleUI();
+
+        // ════════════════════════════════════════════════
+        // 10. Cinemachine 3.x Battle Camera Rig (AAA Settings)
+        // ════════════════════════════════════════════════
+        BattleCameraSetupWindow.Setup();
 
         Debug.Log("[DevilsDiner] シーン階層構築完了。");
     }
@@ -562,6 +553,10 @@ public static class DevilsDinerSetupTool
             legacy.gameObject.SetActive(false);
         var toggleButtons = GameObject.Find("ToggleButtons");
         if (toggleButtons != null) toggleButtons.SetActive(false);
+
+        // ── BattleResultUI 追加 ──
+        var resultUIObj = new GameObject("BattleResultUI");
+        resultUIObj.AddComponent<BattleResultUI>();
 
         Debug.Log("[DevilsDiner] MetaphorBattleUI (UI Toolkit) を構築しました。");
     }

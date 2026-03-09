@@ -1970,4 +1970,33 @@ public sealed class BattleEffectsUI : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
     }
+
+    // ──────────────────────────────────────────────
+    // 回復 / 偵察フラッシュ演出
+    // ──────────────────────────────────────────────
+
+    private static readonly Color HEAL_FLASH_COLOR = new Color(0.2f, 0.9f, 0.4f, 1f);
+    private const float HEAL_FLASH_ALPHA = 0.3f;
+    private const float HEAL_FLASH_IN = 0.1f;
+    private const float HEAL_FLASH_OUT = 0.2f;
+
+    private static readonly Color SCOUT_FLASH_COLOR = new Color(0.3f, 0.6f, 1f, 1f);
+    private const float SCOUT_FLASH_ALPHA = 0.25f;
+    private const float SCOUT_FLASH_IN = 0.08f;
+    private const float SCOUT_FLASH_HOLD = 0.1f;
+    private const float SCOUT_FLASH_OUT = 0.15f;
+
+    /// <summary>回復時の緑フラッシュ演出（約0.3秒）。</summary>
+    public IEnumerator PlayHealFlash()
+    {
+        StartFlash(HEAL_FLASH_COLOR, HEAL_FLASH_ALPHA, HEAL_FLASH_IN, 0f, HEAL_FLASH_OUT);
+        yield return new WaitForSecondsRealtime(HEAL_FLASH_IN + HEAL_FLASH_OUT);
+    }
+
+    /// <summary>偵察時のスキャンライン風青フラッシュ演出（約0.33秒）。</summary>
+    public IEnumerator PlayScoutFlash()
+    {
+        StartFlash(SCOUT_FLASH_COLOR, SCOUT_FLASH_ALPHA, SCOUT_FLASH_IN, SCOUT_FLASH_HOLD, SCOUT_FLASH_OUT);
+        yield return new WaitForSecondsRealtime(SCOUT_FLASH_IN + SCOUT_FLASH_HOLD + SCOUT_FLASH_OUT);
+    }
 }

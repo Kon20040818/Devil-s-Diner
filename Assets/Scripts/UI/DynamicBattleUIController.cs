@@ -13,6 +13,7 @@
 // ・パースペクティブ偽装（カメラ回り込み時の ScaleX / Rotate 微調整）
 // ============================================================
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -25,7 +26,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     // 列挙
     // ──────────────────────────────────────────────
 
-    private enum UIMode { Hidden, CommandSelect, TargetSelect }
+    private enum UIMode { Hidden, CommandSelect, TargetSelect, MealSelect }
 
     // ──────────────────────────────────────────────
     // 定数
@@ -55,15 +56,18 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private const float HINT_OFFSET_X = -140f;
     private const float HINT_OFFSET_Y = 210f;
 
-    // ワールド→スクリーン変換でのキャラ高さ補正
-    private const float WORLD_Y_OFFSET = 0.6f;
+    // ワールド→スクリーン変換でのキャラ高さ補正 (0.0f = 中心)
+    private const float WORLD_Y_OFFSET = 0.0f;
+    
+    // UIの基準となるカメラ距離（近づいた時にUIを拡大する用）
+    private const float REFERENCE_DISTANCE = 8f;
 
     private static readonly CharacterBattleController.ActionType[] SLOT_TO_ACTION =
     {
         CharacterBattleController.ActionType.Skill,        // ARCHETYPE
         CharacterBattleController.ActionType.BasicAttack,   // WEAPON
-        CharacterBattleController.ActionType.Skill,        // SYNTHESIS (placeholder)
-        CharacterBattleController.ActionType.BasicAttack,   // ITEM (placeholder)
+        CharacterBattleController.ActionType.Meal,         // MEAL
+        CharacterBattleController.ActionType.Scout,          // SCOUT
         CharacterBattleController.ActionType.BasicAttack,   // GUARD (placeholder)
     };
 
@@ -98,6 +102,17 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private int _selectedTargetIndex;
     private CharacterBattleController.ActionType _pendingAction;
     private readonly List<CharacterBattleController> _targetList = new List<CharacterBattleController>();
+
+    // Meal 選択
+    private VisualElement _mealPanel;
+    private readonly List<DishInstance> _mealList = new List<DishInstance>();
+    private readonly List<int> _mealQuantities = new List<int>();
+    private int _selectedMealIndex;
+
+    // バフインジケーター
+    private VisualElement _buffContainer;
+    private readonly Dictionary<DishCategory, VisualElement> _buffIcons
+        = new Dictionary<DishCategory, VisualElement>();
 
     // SmoothDamp 状態
     private Vector2 _currentPanelPos;
@@ -231,6 +246,13 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
             if (_battleManager.Queue != null)
                 _battleManager.Queue.OnQueueUpdated -= HandleQueueUpdated;
+
+            var tracker = _battleManager.BuffDurationTracker;
+            if (tracker != null)
+            {
+                tracker.OnBuffApplied -= HandleBuffApplied;
+                tracker.OnBuffExpired -= HandleBuffExpired;
+            }
         }
 
         foreach (var card in _partyCards)
@@ -329,6 +351,29 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
         // 初期位置を即座に設定（SmoothDampの初回ジャンプ防止）
         _currentPanelPos = GetTargetPanelPos();
+
+        // Meal 選択パネル（target-panel と同構造）
+        _mealPanel = new VisualElement();
+        _mealPanel.AddToClassList("target-panel");
+        _mealPanel.AddToClassList("hidden");
+        _commandMenu.Add(_mealPanel);
+
+        // バフインジケーターコンテナ
+        _buffContainer = new VisualElement();
+        _buffContainer.AddToClassList("buff-container");
+        _root.Add(_buffContainer);
+
+        // BuffDurationTracker イベント購読
+        var tracker = _battleManager.BuffDurationTracker;
+        if (tracker != null)
+        {
+            tracker.OnBuffApplied += HandleBuffApplied;
+            tracker.OnBuffExpired += HandleBuffExpired;
+
+            // 既存バフの初期表示
+            foreach (var kvp in tracker.GetActiveBuffs())
+                HandleBuffApplied(kvp.Key, kvp.Value.RemainingTurns);
+        }
 
         BuildSPPips();
         HandleSPChanged(_battleManager.CurrentSP, _battleManager.MaxSP);
@@ -440,6 +485,19 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         _currentPanelPos.y = Mathf.SmoothDamp(
             _currentPanelPos.y, target.y, ref _panelVelocity.y, SMOOTH_TIME, MAX_SPEED, dt);
 
+        // ── 距離ベースのスケール計算 ──
+        float distanceScale = 1f;
+        if (_battleManager != null && _battleManager.ActiveCharacter != null && Camera.main != null)
+        {
+            float dist = Vector3.Distance(Camera.main.transform.position, _battleManager.ActiveCharacter.transform.position);
+            
+            // 距離比率（カメラに近いほど大きくなる）
+            float rawScale = REFERENCE_DISTANCE / Mathf.Clamp(dist, 1f, 50f);
+            
+            // あまりにも巨大になりすぎるのを防ぐため、1.0倍～1.5倍の間に緩やかに収める
+            distanceScale = Mathf.Clamp(Mathf.Lerp(1.0f, rawScale, 0.35f), 0.7f, 1.4f);
+        }
+
         // ── Layer 1: RadialPivot ──
         // translate = SmoothDamp済みプレイヤー位置 + コマンドレイヤー視差
         if (_cmdRadialPivot != null)
@@ -452,10 +510,10 @@ public sealed class DynamicBattleUIController : MonoBehaviour
                 _currentPanelPos.y + cmdParallaxY
             );
 
-            // パースペクティブ偽装: rotate と scaleX を微調整
+            // パースペクティブ偽装: rotate と scaleX を微調整 + 距離スケール適用
             float finalRotate = PERSPECTIVE_BASE_ROTATE + _perspectiveRotate;
             _cmdRadialPivot.style.rotate = new Rotate(Angle.Degrees(finalRotate));
-            _cmdRadialPivot.style.scale = new Scale(new Vector3(_perspectiveScaleX, 1f, 1f));
+            _cmdRadialPivot.style.scale = new Scale(new Vector3(_perspectiveScaleX * distanceScale, distanceScale, 1f));
         }
 
         // ── 背景視差レイヤー ──
@@ -468,18 +526,20 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         if (_cmdInfoGroup != null)
         {
             _cmdInfoGroup.style.translate = new Translate(
-                _currentPanelPos.x + INFO_OFFSET_X,
-                _currentPanelPos.y + INFO_OFFSET_Y
+                _currentPanelPos.x + INFO_OFFSET_X * distanceScale,
+                _currentPanelPos.y + INFO_OFFSET_Y * distanceScale
             );
+            _cmdInfoGroup.style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
         }
 
         // ── ヒント ──
         if (_cmdHintWrap != null)
         {
             _cmdHintWrap.style.translate = new Translate(
-                _currentPanelPos.x + HINT_OFFSET_X,
-                _currentPanelPos.y + HINT_OFFSET_Y
+                _currentPanelPos.x + HINT_OFFSET_X * distanceScale,
+                _currentPanelPos.y + HINT_OFFSET_Y * distanceScale
             );
+            _cmdHintWrap.style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
         }
 
         // ── ターゲットパネル追従 ──
@@ -488,9 +548,23 @@ public sealed class DynamicBattleUIController : MonoBehaviour
             for (int i = 0; i < _targetPanel.childCount; i++)
             {
                 _targetPanel[i].style.translate = new Translate(
-                    _currentPanelPos.x - 130f,
-                    _currentPanelPos.y - 60f + i * 62f
+                    _currentPanelPos.x - 130f * distanceScale,
+                    _currentPanelPos.y + (-60f + i * 62f) * distanceScale
                 );
+                _targetPanel[i].style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
+            }
+        }
+
+        // ── 料理選択パネル追従 ──
+        if (_mode == UIMode.MealSelect && _mealPanel != null)
+        {
+            for (int i = 0; i < _mealPanel.childCount; i++)
+            {
+                _mealPanel[i].style.translate = new Translate(
+                    _currentPanelPos.x - 130f * distanceScale,
+                    _currentPanelPos.y + (-60f + i * 62f) * distanceScale
+                );
+                _mealPanel[i].style.scale = new Scale(new Vector3(distanceScale, distanceScale, 1f));
             }
         }
     }
@@ -569,6 +643,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         UpdateCommandHighlight();
 
         _targetPanel?.AddToClassList("hidden");
+        _mealPanel?.AddToClassList("hidden");
         _commandButtons?.RemoveFromClassList("hidden");
         if (_cmdHint != null) _cmdHint.text = "[W]△ [D]○ [A]× [S]□  [X] Cancel";
 
@@ -578,6 +653,7 @@ public sealed class DynamicBattleUIController : MonoBehaviour
     private void HideCommandMenu()
     {
         _mode = UIMode.Hidden;
+        _mealPanel?.AddToClassList("hidden");
         _commandMenu?.AddToClassList("hidden");
     }
 
@@ -730,36 +806,65 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         if (_mode == UIMode.Hidden) return;
 
         var kb = Keyboard.current;
-        if (kb == null) return;
+        var gp = Gamepad.current;
 
         if (_mode == UIMode.CommandSelect)
         {
-            // △○×□ ダイレクト選択
-            if (kb.wKey.wasPressedThisFrame)       // △ ARCHETYPE
-                SelectAndConfirmCommand(0);
-            else if (kb.dKey.wasPressedThisFrame)   // ○ WEAPON
-                SelectAndConfirmCommand(1);
-            else if (kb.aKey.wasPressedThisFrame)   // × SYNTHESIS
-                SelectAndConfirmCommand(2);
-            else if (kb.sKey.wasPressedThisFrame)   // □ ITEM
-                SelectAndConfirmCommand(3);
-            else if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)  // GUARD
-                SelectAndConfirmCommand(4);
+            // △○×□ ダイレクト選択（キーボード + ゲームパッド）
+            bool cmdTriangle = (kb != null && kb.wKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonNorth.wasPressedThisFrame);
+            bool cmdCircle   = (kb != null && kb.dKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonEast.wasPressedThisFrame);
+            bool cmdCross    = (kb != null && kb.aKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cmdSquare   = (kb != null && kb.sKey.wasPressedThisFrame)
+                            || (gp != null && gp.buttonWest.wasPressedThisFrame);
+            bool cmdGuard    = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                            || (gp != null && gp.rightShoulder.wasPressedThisFrame);
+            bool cmdCancel   = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                            || (gp != null && gp.leftShoulder.wasPressedThisFrame);
 
-            if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
-                HideCommandMenu();
+            if (cmdTriangle)     SelectAndConfirmCommand(0);  // △ ARCHETYPE
+            else if (cmdCircle)  SelectAndConfirmCommand(1);  // ○ WEAPON
+            else if (cmdCross)   SelectAndConfirmCommand(2);  // × SYNTHESIS
+            else if (cmdSquare)  SelectAndConfirmCommand(3);  // □ ITEM
+            else if (cmdGuard)   SelectAndConfirmCommand(4);  // GUARD
+
+            if (cmdCancel) HideCommandMenu();
         }
         else if (_mode == UIMode.TargetSelect)
         {
-            if (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame)
-                NavigateTarget(-1);
-            else if (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame)
-                NavigateTarget(+1);
+            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.up.wasPressedThisFrame);
+            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
+            bool confirm = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cancel  = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
 
-            if (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
-                ConfirmTarget();
-            if (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
-                ReturnToCommandMode();
+            if (navUp)   NavigateTarget(-1);
+            else if (navDown) NavigateTarget(+1);
+
+            if (confirm) ConfirmTarget();
+            if (cancel)  ReturnToCommandMode();
+        }
+        else if (_mode == UIMode.MealSelect)
+        {
+            bool navUp   = (kb != null && (kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.up.wasPressedThisFrame);
+            bool navDown = (kb != null && (kb.downArrowKey.wasPressedThisFrame || kb.sKey.wasPressedThisFrame))
+                        || (gp != null && gp.dpad.down.wasPressedThisFrame);
+            bool confirm = (kb != null && (kb.zKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonSouth.wasPressedThisFrame);
+            bool cancel  = (kb != null && (kb.xKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
+                        || (gp != null && gp.buttonEast.wasPressedThisFrame);
+
+            if (navUp)   NavigateMeal(-1);
+            else if (navDown) NavigateMeal(+1);
+
+            if (confirm) ConfirmMeal();
+            if (cancel)  ReturnFromMealSelect();
         }
     }
 
@@ -782,6 +887,25 @@ public sealed class DynamicBattleUIController : MonoBehaviour
         }
 
         _pendingAction = SLOT_TO_ACTION[_selectedCommandIndex];
+
+        // Meal → 料理選択サブメニューへ遷移
+        if (_pendingAction == CharacterBattleController.ActionType.Meal)
+        {
+            EnterMealSelection();
+            return;
+        }
+
+        // AoE スキル → ターゲット選択をスキップして即実行
+        if (_pendingAction == CharacterBattleController.ActionType.Skill
+            && _battleManager.ActiveCharacter != null
+            && _battleManager.ActiveCharacter.Stats != null
+            && _battleManager.ActiveCharacter.Stats.SkillTargetMode == CharacterStats.TargetingMode.AllEnemies)
+        {
+            _battleManager.ExecutePlayerAction(CharacterBattleController.ActionType.Skill, null);
+            HideCommandMenu();
+            return;
+        }
+
         EnterTargetSelection();
     }
 
@@ -801,6 +925,222 @@ public sealed class DynamicBattleUIController : MonoBehaviour
 
         HideCommandMenu();
         _battleManager.ExecutePlayerAction(_pendingAction, target);
+    }
+
+    // ════════════════════════════════════════════════
+    // 料理選択
+    // ════════════════════════════════════════════════
+
+    private void EnterMealSelection()
+    {
+        _mealList.Clear();
+        _mealQuantities.Clear();
+        _selectedMealIndex = 0;
+
+        if (GameManager.Instance == null || GameManager.Instance.Inventory == null)
+        {
+            StartCoroutine(ShowNoMealsAndReturn());
+            return;
+        }
+
+        var allDishes = GameManager.Instance.Inventory.GetAllDishes();
+        foreach (var kvp in allDishes)
+        {
+            if (kvp.Value > 0)
+            {
+                _mealList.Add(kvp.Key);
+                _mealQuantities.Add(kvp.Value);
+            }
+        }
+
+        if (_mealList.Count == 0)
+        {
+            StartCoroutine(ShowNoMealsAndReturn());
+            return;
+        }
+
+        _mode = UIMode.MealSelect;
+        _commandButtons?.AddToClassList("hidden");
+        _targetPanel?.AddToClassList("hidden");
+        _mealPanel?.RemoveFromClassList("hidden");
+
+        RebuildMealEntries();
+        UpdateMealHighlight();
+
+        if (_cmdHint != null) _cmdHint.text = "[Z] Confirm  [X] Back  [W/S] Select";
+    }
+
+    private IEnumerator ShowNoMealsAndReturn()
+    {
+        if (_cmdHint != null) _cmdHint.text = "料理がありません";
+        yield return new WaitForSecondsRealtime(1.2f);
+        ReturnToCommandMode();
+    }
+
+    private void RebuildMealEntries()
+    {
+        if (_mealPanel == null) return;
+        _mealPanel.Clear();
+
+        for (int i = 0; i < _mealList.Count; i++)
+        {
+            var dish = _mealList[i];
+            int qty = _mealQuantities[i];
+
+            var slot = new VisualElement();
+            slot.AddToClassList("target-slot");
+
+            var bg = new VisualElement();
+            bg.AddToClassList("target-bg");
+
+            // 品質バッジ + 料理名
+            string qualityBadge = dish.Quality switch
+            {
+                DishQuality.Poor     => "[失敗] ",
+                DishQuality.Normal   => "",
+                DishQuality.Fine     => "[上出来] ",
+                DishQuality.Exquisite => "[極上] ",
+                _ => ""
+            };
+
+            // バフ種別テキスト
+            string buffType = dish.Category switch
+            {
+                DishCategory.Meat    => "ATK",
+                DishCategory.Fish    => "SPD",
+                DishCategory.Salad   => "DEF",
+                DishCategory.Dessert => "RGN",
+                _ => "---"
+            };
+
+            var nameLabel = new Label($"{qualityBadge}{dish}");
+            nameLabel.AddToClassList("target-text");
+
+            var detailLabel = new Label($"HP+{dish.HealAmount}  {buffType}+{dish.BuffAmount:F0}%  x{qty}");
+            detailLabel.AddToClassList("target-hp");
+
+            slot.Add(bg);
+            slot.Add(nameLabel);
+            slot.Add(detailLabel);
+
+            int idx = i;
+            slot.RegisterCallback<ClickEvent>(_ =>
+            {
+                _selectedMealIndex = idx;
+                UpdateMealHighlight();
+                ConfirmMeal();
+            });
+
+            _mealPanel.Add(slot);
+        }
+    }
+
+    private void UpdateMealHighlight()
+    {
+        if (_mealPanel == null) return;
+
+        for (int i = 0; i < _mealPanel.childCount; i++)
+        {
+            if (i == _selectedMealIndex)
+                _mealPanel[i].AddToClassList("is-active");
+            else
+                _mealPanel[i].RemoveFromClassList("is-active");
+        }
+    }
+
+    private void NavigateMeal(int delta)
+    {
+        if (_mealList.Count == 0) return;
+        _selectedMealIndex = (_selectedMealIndex + delta + _mealList.Count) % _mealList.Count;
+        UpdateMealHighlight();
+    }
+
+    private void ConfirmMeal()
+    {
+        if (_mealList.Count == 0 || _selectedMealIndex >= _mealList.Count) return;
+
+        var selected = _mealList[_selectedMealIndex];
+        var self = _battleManager.ActiveCharacter;
+        if (self == null) return;
+
+        _battleManager.SetSelectedDish(selected);
+        Debug.Log($"[DynamicBattleUI] Meal 選択: {selected} → {self.DisplayName}");
+
+        HideCommandMenu();
+        _battleManager.ExecutePlayerAction(CharacterBattleController.ActionType.Meal, self);
+    }
+
+    private void ReturnFromMealSelect()
+    {
+        _mealPanel?.AddToClassList("hidden");
+        ReturnToCommandMode();
+    }
+
+    // ════════════════════════════════════════════════
+    // バフインジケーター
+    // ════════════════════════════════════════════════
+
+    private void HandleBuffApplied(DishCategory category, int remainingTurns)
+    {
+        if (_buffContainer == null) return;
+
+        if (_buffIcons.TryGetValue(category, out var existing))
+        {
+            // 残ターン数を更新
+            var turnsLabel = existing.Q<Label>("buff-turns-label");
+            if (turnsLabel != null) turnsLabel.text = $"{remainingTurns}T";
+            return;
+        }
+
+        // 新規アイコン生成
+        var icon = new VisualElement();
+        icon.AddToClassList("buff-icon");
+        icon.AddToClassList(GetBuffIconClass(category));
+
+        var label = new Label(GetBuffCategoryLabel(category));
+        label.AddToClassList("buff-label");
+
+        var turns = new Label($"{remainingTurns}T");
+        turns.AddToClassList("buff-turns");
+        turns.name = "buff-turns-label";
+
+        icon.Add(label);
+        icon.Add(turns);
+
+        _buffContainer.Add(icon);
+        _buffIcons[category] = icon;
+    }
+
+    private void HandleBuffExpired(DishCategory category)
+    {
+        if (!_buffIcons.TryGetValue(category, out var icon)) return;
+
+        icon.RemoveFromHierarchy();
+        _buffIcons.Remove(category);
+    }
+
+    private static string GetBuffCategoryLabel(DishCategory category)
+    {
+        return category switch
+        {
+            DishCategory.Meat    => "ATK",
+            DishCategory.Fish    => "SPD",
+            DishCategory.Salad   => "DEF",
+            DishCategory.Dessert => "RGN",
+            _ => "???"
+        };
+    }
+
+    private static string GetBuffIconClass(DishCategory category)
+    {
+        return category switch
+        {
+            DishCategory.Meat    => "buff-icon-atk",
+            DishCategory.Fish    => "buff-icon-spd",
+            DishCategory.Salad   => "buff-icon-def",
+            DishCategory.Dessert => "buff-icon-rgn",
+            _ => "buff-icon-atk"
+        };
     }
 
     // ════════════════════════════════════════════════
