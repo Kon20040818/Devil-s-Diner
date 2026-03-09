@@ -1,0 +1,2 @@
+Id,DisplayName,Element,MaxHP,Attack,Defense,Speed,MaxEP,EPGainOnAttack,EPGainOnHit,EPGainOnSkill,SkillMultiplier,UltimateMultiplier,SkillTargetMode,MaxToughness,WeakElements,BaseActionValue,PhysicalRes,FireRes,IceRes,LightningRes,WindRes,DarkRes
+STAT_Hero,ヒーロー,Fire,500,45,20,110,120,20,10,30,1.5,3.0,Single,0,,10000,0,0,0,0,0,0

@@ -1,0 +1,9 @@
+Id,DisplayName,Description,Type,Value,TargetCategory,Rarity
+SBUF_QualityUp,品質向上,料理の品質スコアにボーナス,QualityBonus,0.15,,1
+SBUF_SatisfactionUp,接客上手,顧客満足度にボーナス,SatisfactionBonus,0.10,,1
+SBUF_FreshnessUp,鮮度管理,鮮度バフ倍率にボーナス,FreshnessBonus,0.10,,2
+SBUF_CookSpeed,手際良い,調理速度アップ,CookSpeed,0.20,,2
+SBUF_SalaryDown,質素,給料を割引,SalaryReduction,0.15,,3
+SBUF_MeatSpecialty,肉料理の達人,肉料理の品質にボーナス,CategorySpecialty,0.25,Meat,3
+SBUF_SaladSpecialty,サラダ職人,サラダの品質にボーナス,CategorySpecialty,0.25,Salad,3
+SBUF_SuperQuality,超絶品質,料理の品質を大幅アップ,QualityBonus,0.30,,5

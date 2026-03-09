@@ -1,0 +1,7 @@
+Id,DisplayName,Description,SellPrice,BaseDamage,BasePartBreakValue,JustInputFrameBonus
+WPN_Starter,初期装備,冒険者の基本武器。,50,80,8,0
+WPN_Light,軽量剣,素早い斬撃が持ち味の軽い剣。,120,70,6,2
+WPN_Heavy,重斧,一撃の威力に特化した大斧。,150,140,15,0
+WPN_Standard,標準剣,バランスの取れた一般的な剣。,100,100,10,1
+WPN_Dummy,ダミー武器,テスト用の武器。,10,50,5,0
+WPN_Test,テスト武器,デバッグ用高性能武器。,1,200,20,5

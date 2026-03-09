@@ -1,0 +1,6 @@
+Id,EnemyName,MaxHP,BaseAttack,DropItemNormal,DropItemJust,DropRateNormal,DropRateJust,GoldReward,StaffRace,StatsId
+ENM_Cactus,サボテン,500,30,ING_Vegetable,ING_Herb,0.8,1.0,80,RACE_Cactus,STAT_Cactus
+ENM_Boss,ボス悪魔,1500,60,ING_Meat,ING_Bone,0.8,1.0,200,RACE_Boss,STAT_Boss
+ENM_DragonLord,竜王,2000,80,ING_Meat,ING_Scale,0.7,1.0,500,RACE_DragonLord,STAT_DragonLord
+ENM_PoisonHydra,ポイズンヒドラ,1000,50,ING_Bone,ING_Poison,0.8,1.0,150,RACE_PoisonHydra,STAT_PoisonHydra
+ENM_Dummy,ダミー,200,15,ING_Vegetable,ING_Meat,0.9,1.0,50,RACE_Dummy,STAT_Dummy

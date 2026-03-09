@@ -1,0 +1,4 @@
+Id,EventName,Description,TriggerDays,BonusCategoryEnabled,BonusCategory,SatisfactionMultiplier,FreshnessMultiplier
+CAL_MeatDay,肉の日,肉料理の売上と品質がアップ！,3;10;17,true,Meat,1.5,1.3
+CAL_HarvestFest,収穫祭,サラダ系の満足度が大幅アップ！,7;14,true,Salad,1.8,1.2
+CAL_GourmetWeek,グルメウィーク,全カテゴリの品質がアップ！,5;12;19,false,Meat,1.3,1.5

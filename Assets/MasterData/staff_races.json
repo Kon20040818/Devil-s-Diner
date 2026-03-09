@@ -1,0 +1,52 @@
+[
+  {
+    "id": "RACE_Cactus",
+    "raceName": "サボテン族",
+    "fixedEffect": "SatisfactionUp",
+    "fixedEffectValue": 0.10,
+    "baseSalary": 40,
+    "possibleBuffs": ["SBUF_SatisfactionUp", "SBUF_CookSpeed", "SBUF_SalaryDown"],
+    "minBuffCount": 1,
+    "maxBuffCount": 2
+  },
+  {
+    "id": "RACE_Boss",
+    "raceName": "ボス族",
+    "fixedEffect": "QualityUp",
+    "fixedEffectValue": 0.15,
+    "baseSalary": 80,
+    "possibleBuffs": ["SBUF_QualityUp", "SBUF_FreshnessUp", "SBUF_MeatSpecialty", "SBUF_SuperQuality"],
+    "minBuffCount": 1,
+    "maxBuffCount": 3
+  },
+  {
+    "id": "RACE_DragonLord",
+    "raceName": "竜族",
+    "fixedEffect": "QualityUp",
+    "fixedEffectValue": 0.20,
+    "baseSalary": 100,
+    "possibleBuffs": ["SBUF_QualityUp", "SBUF_MeatSpecialty", "SBUF_SuperQuality"],
+    "minBuffCount": 2,
+    "maxBuffCount": 3
+  },
+  {
+    "id": "RACE_PoisonHydra",
+    "raceName": "ヒドラ族",
+    "fixedEffect": "CookSpeedUp",
+    "fixedEffectValue": 0.15,
+    "baseSalary": 60,
+    "possibleBuffs": ["SBUF_FreshnessUp", "SBUF_CookSpeed", "SBUF_SaladSpecialty"],
+    "minBuffCount": 1,
+    "maxBuffCount": 2
+  },
+  {
+    "id": "RACE_Dummy",
+    "raceName": "ダミー族",
+    "fixedEffect": "SalaryDiscount",
+    "fixedEffectValue": 0.20,
+    "baseSalary": 20,
+    "possibleBuffs": ["SBUF_SatisfactionUp", "SBUF_SalaryDown"],
+    "minBuffCount": 1,
+    "maxBuffCount": 1
+  }
+]
