@@ -29,11 +29,13 @@ public static class DevilsDinerSetupTool
 
     private static readonly string[] _folders = new string[]
     {
-        "Assets/Data/Materials",
-        "Assets/Data/Weapons",
-        "Assets/Data/Enemies",
-        "Assets/Data/Characters",
-        "Assets/Data/Config",
+        "Assets/Resources",
+        "Assets/Resources/Data",
+        "Assets/Resources/Data/Materials",
+        "Assets/Resources/Data/Weapons",
+        "Assets/Resources/Data/Enemies",
+        "Assets/Resources/Data/Characters",
+        "Assets/Resources/Data/Config",
         "Assets/UI",
     };
 
@@ -112,11 +114,11 @@ public static class DevilsDinerSetupTool
 
     private static void CreateScriptableObjects()
     {
-        CreateSOIfNotExists<IngredientData>("Assets/Data/Ingredients", "ING_Dummy");
-        CreateSOIfNotExists<WeaponData>("Assets/Data/Weapons", "WPN_Dummy");
-        CreateSOIfNotExists<EnemyData>("Assets/Data/Enemies", "ENM_Dummy");
+        CreateSOIfNotExists<IngredientData>("Assets/Resources/Data/Ingredients", "ING_Dummy");
+        CreateSOIfNotExists<WeaponData>("Assets/Resources/Data/Weapons", "WPN_Dummy");
+        CreateSOIfNotExists<EnemyData>("Assets/Resources/Data/Enemies", "ENM_Dummy");
 
-        var heroStats = CreateSOIfNotExists<CharacterStats>("Assets/Data/Characters", "STAT_Hero");
+        var heroStats = CreateSOIfNotExists<CharacterStats>("Assets/Resources/Data/Characters", "STAT_Hero");
         if (heroStats != null)
         {
             SetCharacterStats(heroStats, "hero_01", "ヒーロー",
@@ -124,7 +126,7 @@ public static class DevilsDinerSetupTool
                 element: CharacterStats.ElementType.Fire);
         }
 
-        var slimeStats = CreateSOIfNotExists<CharacterStats>("Assets/Data/Characters", "STAT_Slime");
+        var slimeStats = CreateSOIfNotExists<CharacterStats>("Assets/Resources/Data/Characters", "STAT_Slime");
         if (slimeStats != null)
         {
             SetCharacterStats(slimeStats, "enemy_slime", "スライム",
@@ -186,8 +188,8 @@ public static class DevilsDinerSetupTool
 
     private static void BuildSceneHierarchy()
     {
-        var heroStats = AssetDatabase.LoadAssetAtPath<CharacterStats>("Assets/Data/Characters/STAT_Hero.asset");
-        var slimeStats = AssetDatabase.LoadAssetAtPath<CharacterStats>("Assets/Data/Characters/STAT_Slime.asset");
+        var heroStats = AssetDatabase.LoadAssetAtPath<CharacterStats>("Assets/Resources/Data/Characters/STAT_Hero.asset");
+        var slimeStats = AssetDatabase.LoadAssetAtPath<CharacterStats>("Assets/Resources/Data/Characters/STAT_Slime.asset");
 
         // ════════════════════════════════════════════════
         // 1. BattleSystem

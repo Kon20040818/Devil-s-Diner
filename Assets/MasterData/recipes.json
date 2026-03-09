@@ -1,0 +1,35 @@
+[
+  { "id": "RCP_HellSteak",         "displayName": "地獄のステーキ",       "description": "業火で焼き上げた定番肉料理。",             "dishId": "DISH_HellSteak",        "chefLevel": 1, "ingredients": [["ING_Meat",2]] },
+  { "id": "RCP_DemonBurger",       "displayName": "デーモンバーガー",     "description": "悪魔の力が宿るバーガー。",                 "dishId": "DISH_DemonBurger",      "chefLevel": 2, "ingredients": [["ING_Meat",2],["ING_Vegetable",1]] },
+  { "id": "RCP_InfernalMeatPie",   "displayName": "煉獄ミートパイ",       "description": "地獄の窯で焼いたパイ。",                   "dishId": "DISH_InfernalMeatPie",  "chefLevel": 2, "ingredients": [["ING_Meat",1],["ING_Egg",1],["ING_Vegetable",1]] },
+  { "id": "RCP_BoneMarrowSoup",    "displayName": "魔骨の髄スープ",       "description": "魔獣の骨から抽出した濃厚スープ。",         "dishId": "DISH_BoneMarrowSoup",   "chefLevel": 3, "ingredients": [["ING_Bone",2],["ING_Meat",1],["ING_Herb",1]] },
+  { "id": "RCP_CerberusDon",       "displayName": "ケルベロス丼",         "description": "三種の肉を豪快に盛った地獄丼。",           "dishId": "DISH_CerberusDon",      "chefLevel": 3, "ingredients": [["ING_Meat",3],["ING_Spice",1]] },
+  { "id": "RCP_PurgatoryCurry",    "displayName": "煉獄カレー",           "description": "獄炎香辛料をふんだんに使った激辛カレー。", "dishId": "DISH_PurgatoryCurry",   "chefLevel": 3, "ingredients": [["ING_Meat",1],["ING_Vegetable",1],["ING_Spice",2]] },
+  { "id": "RCP_DragonRoast",       "displayName": "竜鱗カルビ",           "description": "竜鱗を鋳型にして焼き上げた極上品。",       "dishId": "DISH_DragonRoast",      "chefLevel": 4, "ingredients": [["ING_Scale",1],["ING_Meat",2],["ING_Spice",1]] },
+  { "id": "RCP_SatanicSirloin",    "displayName": "魔王のサーロイン",     "description": "魔界最高級の究極の一皿。",                 "dishId": "DISH_SatanicSirloin",   "chefLevel": 5, "ingredients": [["ING_Meat",2],["ING_Scale",2],["ING_Crystal",1]] },
+
+  { "id": "RCP_AbyssGrillFish",    "displayName": "深淵の炙り焼き",       "description": "深淵魚を丸ごと炙った一品。",               "dishId": "DISH_AbyssGrillFish",   "chefLevel": 1, "ingredients": [["ING_Fish",2]] },
+  { "id": "RCP_LeviathanSashimi",  "displayName": "リヴァイアサン刺身",   "description": "海魔の新鮮な身を薄切りに。",               "dishId": "DISH_LeviathanSashimi", "chefLevel": 2, "ingredients": [["ING_Fish",2],["ING_Herb",1]] },
+  { "id": "RCP_FishEggOmelet",     "displayName": "魔魚の卵オムレツ",     "description": "魔卵と深淵魚の卵を混ぜたオムレツ。",       "dishId": "DISH_FishEggOmelet",    "chefLevel": 2, "ingredients": [["ING_Fish",1],["ING_Egg",2]] },
+  { "id": "RCP_PoisonFishStew",    "displayName": "毒魚のフグ鍋",         "description": "猛毒を持つ魚を巧みに調理した危険な鍋。",   "dishId": "DISH_PoisonFishStew",   "chefLevel": 3, "ingredients": [["ING_Fish",1],["ING_Poison",1],["ING_Vegetable",1]] },
+  { "id": "RCP_KrakenPasta",       "displayName": "クラーケンパスタ",     "description": "海魔の触腕を贅沢に使ったペスカトーレ。",   "dishId": "DISH_KrakenPasta",      "chefLevel": 3, "ingredients": [["ING_Fish",2],["ING_Herb",1],["ING_Spice",1]] },
+  { "id": "RCP_DragonScaleSushi",  "displayName": "竜鱗寿司",             "description": "竜鱗のように並べた美しい寿司。",           "dishId": "DISH_DragonScaleSushi", "chefLevel": 4, "ingredients": [["ING_Fish",2],["ING_Scale",1],["ING_Spice",1]] },
+  { "id": "RCP_PhoenixPaella",     "displayName": "不死鳥のパエリア",     "description": "伝説の鳥の魂が宿る炊き込みご飯。",        "dishId": "DISH_PhoenixPaella",    "chefLevel": 5, "ingredients": [["ING_Fish",2],["ING_Crystal",1],["ING_Spice",1],["ING_Egg",1]] },
+
+  { "id": "RCP_HellSalad",         "displayName": "地獄のシーザーサラダ", "description": "灼熱の大地で育った野菜のサラダ。",         "dishId": "DISH_HellSalad",        "chefLevel": 1, "ingredients": [["ING_Vegetable",2]] },
+  { "id": "RCP_HerbMushroomSaute", "displayName": "冥茸と薬草のソテー",   "description": "闇の森で採れた茸と薬草の炒め物。",         "dishId": "DISH_HerbMushroomSaute","chefLevel": 2, "ingredients": [["ING_Mushroom",2],["ING_Herb",1]] },
+  { "id": "RCP_PoisonHerbSalad",   "displayName": "毒消しサラダ",         "description": "毒素を薬草で中和した健康サラダ。",         "dishId": "DISH_PoisonHerbSalad",  "chefLevel": 2, "ingredients": [["ING_Poison",1],["ING_Herb",2],["ING_Vegetable",1]] },
+  { "id": "RCP_MushroomPotage",    "displayName": "冥茸のポタージュ",     "description": "闇の茸をじっくり煮込んだ濃厚ポタージュ。", "dishId": "DISH_MushroomPotage",   "chefLevel": 2, "ingredients": [["ING_Mushroom",2],["ING_Vegetable",1]] },
+  { "id": "RCP_GardenOfSin",       "displayName": "罪の菜園盛り",         "description": "禁断の果実と魔界野菜の盛り合わせ。",       "dishId": "DISH_GardenOfSin",      "chefLevel": 3, "ingredients": [["ING_Fruit",2],["ING_Vegetable",1],["ING_Mushroom",1]] },
+  { "id": "RCP_CrystalVegeGratin", "displayName": "魔晶野菜グラタン",     "description": "魔晶石の熱で焼き上げたグラタン。",         "dishId": "DISH_CrystalVegeGratin","chefLevel": 4, "ingredients": [["ING_Crystal",1],["ING_Vegetable",2],["ING_Egg",1]] },
+  { "id": "RCP_EternalSaladBowl",  "displayName": "永劫のサラダボウル",   "description": "食べても減らない伝説のサラダ。",           "dishId": "DISH_EternalSaladBowl", "chefLevel": 5, "ingredients": [["ING_Crystal",1],["ING_Herb",2],["ING_Vegetable",2],["ING_Mushroom",1]] },
+
+  { "id": "RCP_DarkChocolateCake",  "displayName": "暗黒チョコケーキ",     "description": "闇を練り込んだ濃厚チョコケーキ。",        "dishId": "DISH_DarkChocolateCake", "chefLevel": 1, "ingredients": [["ING_Egg",1],["ING_Fruit",1]] },
+  { "id": "RCP_ForbiddenPudding",   "displayName": "禁断のプリン",         "description": "食べた者を虜にする魔性のプリン。",        "dishId": "DISH_ForbiddenPudding",  "chefLevel": 2, "ingredients": [["ING_Egg",2],["ING_Herb",1]] },
+  { "id": "RCP_MushroomParfait",    "displayName": "冥茸パフェ",           "description": "甘く煮た冥茸を層状に重ねたパフェ。",      "dishId": "DISH_MushroomParfait",   "chefLevel": 2, "ingredients": [["ING_Mushroom",2],["ING_Fruit",1]] },
+  { "id": "RCP_PoisonMacarons",     "displayName": "毒マカロン",           "description": "毒々しい色合いのマカロン。",              "dishId": "DISH_PoisonMacarons",    "chefLevel": 2, "ingredients": [["ING_Poison",1],["ING_Egg",1],["ING_Fruit",1]] },
+  { "id": "RCP_BoneIceCream",       "displayName": "魔骨ジェラート",       "description": "魔骨エキスで作る冷菓。",                  "dishId": "DISH_BoneIceCream",      "chefLevel": 2, "ingredients": [["ING_Bone",1],["ING_Fruit",2]] },
+  { "id": "RCP_HellfireCremeBrulee","displayName": "業火のクレームブリュレ","description": "地獄の炎でカラメリゼした至高のブリュレ。","dishId": "DISH_HellfireCremeBrulee","chefLevel": 3, "ingredients": [["ING_Egg",1],["ING_Fruit",1],["ING_Spice",1]] },
+  { "id": "RCP_CrystalFruitTart",   "displayName": "魔晶フルーツタルト",   "description": "魔晶石の輝きを閉じ込めたタルト。",      "dishId": "DISH_CrystalFruitTart",  "chefLevel": 4, "ingredients": [["ING_Crystal",1],["ING_Fruit",2],["ING_Egg",1]] },
+  { "id": "RCP_SevenSinsGateau",    "displayName": "七つの大罪ガトー",     "description": "七層構造の禁断のガトー。",                "dishId": "DISH_SevenSinsGateau",   "chefLevel": 5, "ingredients": [["ING_Crystal",1],["ING_Egg",2],["ING_Fruit",2],["ING_Spice",1]] }
+]

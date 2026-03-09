@@ -3,6 +3,9 @@
 // メニュー「DevilsDiner > Generate Sample Staff & Calendar Data」で
 // StaffBuffData / StaffRaceData / CalendarEventData を一括生成する。
 // 既存 EnemyData への StaffRace 紐付けも行う。
+//
+// 素材・料理・レシピ・家具データは MasterDataImporter に委譲。
+// CSV / JSON ファイル (Assets/MasterData/) を先にインポートすること。
 // ============================================================
 #if UNITY_EDITOR
 using System.IO;
@@ -11,56 +14,44 @@ using UnityEngine;
 
 /// <summary>
 /// テスト・デバッグ用サンプルデータを一括生成するエディタツール。
+/// 素材・料理・レシピ・家具は MasterDataImporter に委譲済み。
 /// </summary>
 public static class SampleDataGenerator
 {
-    private const string BUFF_DIR      = "Assets/Data/StaffBuffs";
-    private const string RACE_DIR      = "Assets/Data/StaffRaces";
-    private const string CAL_DIR       = "Assets/Data/CalendarEvents";
-    private const string ENEMY_DIR     = "Assets/Data/Enemies";
-    private const string FURNITURE_DIR = "Assets/Data/Furniture";
-    private const string DISH_DIR       = "Assets/Data/Dishes";
-    private const string RECIPE_DIR    = "Assets/Data/Recipes";
-    private const string QUALITY_DIR   = "Assets/Data";
-    private const string MATERIAL_DIR  = "Assets/Data/Materials";
-    private const string INGREDIENT_DIR = "Assets/Data/Ingredients";
+    private const string DATA_ROOT      = "Assets/Resources/Data";
+    private const string BUFF_DIR      = DATA_ROOT + "/StaffBuffs";
+    private const string RACE_DIR      = DATA_ROOT + "/StaffRaces";
+    private const string CAL_DIR       = DATA_ROOT + "/CalendarEvents";
+    private const string ENEMY_DIR     = DATA_ROOT + "/Enemies";
+    private const string INGREDIENT_DIR = DATA_ROOT + "/Ingredients";
 
     [MenuItem("DevilsDiner/Generate Sample Staff && Calendar Data")]
     public static void Generate()
     {
+        // Resources/Data ルートを先に作成
+        EnsureDirectory("Assets/Resources");
+        EnsureDirectory(DATA_ROOT);
         EnsureDirectory(BUFF_DIR);
         EnsureDirectory(RACE_DIR);
         EnsureDirectory(CAL_DIR);
 
-        // ── StaffBuffData 生成 ──
+        // ── 1. MasterDataImporter で素材・料理・レシピ・家具を一括インポート ──
+        MasterDataImporter.ImportAll();
+
+        // ── 2. StaffBuffData 生成 ──
         var buffs = GenerateBuffs();
 
-        // ── StaffRaceData 生成 ──
+        // ── 3. StaffRaceData 生成 ──
         var races = GenerateRaces(buffs);
 
-        // ── CalendarEventData 生成 ──
+        // ── 4. CalendarEventData 生成 ──
         GenerateCalendarEvents();
 
-        // ── FurnitureData 生成 ──
-        GenerateFurniture();
-
-        // ── EnemyData に StaffRace 紐付け ──
+        // ── 5. EnemyData に StaffRace 紐付け ──
         WireEnemyRaces(races);
 
-        // ── IngredientData 生成（MAT_* を ING_* に移行）──
-        var ingredients = GenerateIngredients();
-
-        // ── QualityScaleTable 生成 ──
-        var qualityTable = GenerateQualityScaleTable();
-
-        // ── DishData 生成 ──
-        var dishes = GenerateDishes(qualityTable);
-
-        // ── RecipeData 生成（新スキーマ）──
-        GenerateRecipes(dishes, ingredients);
-
-        // ── EnemyData ドロップ枠に IngredientData を結線 ──
-        WireEnemyDrops(ingredients);
+        // ── 6. EnemyData ドロップ枠に IngredientData を結線 ──
+        WireEnemyDrops();
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -245,49 +236,6 @@ public static class SampleDataGenerator
     }
 
     // ──────────────────────────────────────────────
-    // FurnitureData
-    // ──────────────────────────────────────────────
-
-    private static void GenerateFurniture()
-    {
-        EnsureDirectory(FURNITURE_DIR);
-
-        CreateFurniture("FRN_Table",          "テーブルセット",   "席を増やして来客数アップ",
-                        FurnitureData.FurnitureType.Table, 200, 0.1f, 1);
-        CreateFurniture("FRN_Decoration",     "装飾品",           "おしゃれな内装で満足度アップ",
-                        FurnitureData.FurnitureType.Decoration, 500, 0.2f, 0);
-        CreateFurniture("FRN_KitchenUpgrade", "厨房改修",         "設備一新で大幅ボーナス",
-                        FurnitureData.FurnitureType.Kitchen, 1000, 0.3f, 2);
-    }
-
-    private static void CreateFurniture(
-        string id, string furnitureName, string desc,
-        FurnitureData.FurnitureType type, int price,
-        float satisfactionBonus, int customerBonus)
-    {
-        string path = $"{FURNITURE_DIR}/{id}.asset";
-        if (AssetDatabase.LoadAssetAtPath<FurnitureData>(path) != null)
-        {
-            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
-            return;
-        }
-
-        var asset = ScriptableObject.CreateInstance<FurnitureData>();
-        var so = new SerializedObject(asset);
-        so.FindProperty("_id").stringValue = id;
-        so.FindProperty("_furnitureName").stringValue = furnitureName;
-        so.FindProperty("_description").stringValue = desc;
-        so.FindProperty("_type").enumValueIndex = (int)type;
-        so.FindProperty("_price").intValue = price;
-        so.FindProperty("_satisfactionBonus").floatValue = satisfactionBonus;
-        so.FindProperty("_customerBonus").intValue = customerBonus;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        AssetDatabase.CreateAsset(asset, path);
-        Debug.Log($"[SampleDataGenerator] 生成: {path}");
-    }
-
-    // ──────────────────────────────────────────────
     // EnemyData 紐付け
     // ──────────────────────────────────────────────
 
@@ -330,85 +278,35 @@ public static class SampleDataGenerator
     }
 
     // ──────────────────────────────────────────────
-    // IngredientData（素材アイテム生成）
-    // ──────────────────────────────────────────────
-
-    /// <summary>
-    /// IngredientData アセットを生成する。
-    /// 旧 MaterialData (MAT_*) のパラメータを引き継ぎつつ、
-    /// ItemData ベースの IngredientData (ING_*) として再生成する。
-    /// </summary>
-    private static IngredientData[] GenerateIngredients()
-    {
-        EnsureDirectory(INGREDIENT_DIR);
-
-        var definitions = new[]
-        {
-            new IngDef("ING_Meat",      "生肉",     "新鮮な肉。ステーキやシチューに。",         1, 0.80f, 1.0f, 20),
-            new IngDef("ING_Vegetable", "野菜",     "みずみずしい野菜。サラダやシチューに。",   1, 0.90f, 0.8f, 15),
-            new IngDef("ING_Bone",      "骨",       "硬い骨。出汁を取れる珍しい素材。",         2, 0.60f, 1.2f, 30),
-            new IngDef("ING_Scale",     "鱗",       "竜の鱗。最高級の調味素材。",               3, 0.40f, 1.5f, 80),
-            new IngDef("ING_Poison",    "毒腺",     "毒蛇の毒腺。独特の風味を生み出す。",       3, 0.50f, 1.3f, 60),
-            new IngDef("ING_Herb",      "薬草",     "森に自生する薬草。デザートの隠し味に。",   2, 0.70f, 0.9f, 25),
-        };
-
-        var results = new IngredientData[definitions.Length];
-        for (int i = 0; i < definitions.Length; i++)
-        {
-            results[i] = CreateIngredient(definitions[i]);
-        }
-        return results;
-    }
-
-    private static IngredientData CreateIngredient(IngDef def)
-    {
-        string path = $"{INGREDIENT_DIR}/{def.Id}.asset";
-        var existing = AssetDatabase.LoadAssetAtPath<IngredientData>(path);
-        if (existing != null)
-        {
-            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
-            return existing;
-        }
-
-        var asset = ScriptableObject.CreateInstance<IngredientData>();
-        var so = new SerializedObject(asset);
-        // ItemData 基底フィールド
-        so.FindProperty("_itemID").stringValue = def.Id;
-        so.FindProperty("_displayName").stringValue = def.DisplayName;
-        so.FindProperty("_description").stringValue = def.Description;
-        so.FindProperty("_sellPrice").intValue = def.SellPrice;
-        // IngredientData 固有フィールド
-        so.FindProperty("_rarity").intValue = def.Rarity;
-        so.FindProperty("_dropRate").floatValue = def.DropRate;
-        so.FindProperty("_gaugeSpeedMultiplier").floatValue = def.GaugeSpeedMultiplier;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        AssetDatabase.CreateAsset(asset, path);
-        Debug.Log($"[SampleDataGenerator] 生成: {path}");
-        return asset;
-    }
-
-    // ──────────────────────────────────────────────
     // EnemyData ドロップ結線
     // ──────────────────────────────────────────────
 
     /// <summary>
     /// EnemyData の _dropItemNormal / _dropItemJust に IngredientData を結線する。
+    /// MasterDataImporter でインポート済みのアセットを ID で検索して使用。
     /// </summary>
-    private static void WireEnemyDrops(IngredientData[] ingredients)
+    private static void WireEnemyDrops()
     {
-        // ingredients: 0=Meat, 1=Vegetable, 2=Bone, 3=Scale, 4=Poison, 5=Herb
-
-        var mapping = new (string enemyFile, int normalIdx, int justIdx)[]
+        // MasterDataImporter が生成済みの IngredientData を ID で引く
+        IngredientData LoadIng(string id)
         {
-            ("ENM_Cactus",      1, 5),  // 通常: 野菜,     ジャスト: 薬草
-            ("ENM_Boss",        0, 2),  // 通常: 生肉,     ジャスト: 骨
-            ("ENM_DragonLord",  0, 3),  // 通常: 生肉,     ジャスト: 鱗
-            ("ENM_PoisonHydra", 2, 4),  // 通常: 骨,       ジャスト: 毒腺
-            ("ENM_Dummy",       1, 0),  // 通常: 野菜,     ジャスト: 生肉
+            string path = $"{INGREDIENT_DIR}/{id}.asset";
+            var asset = AssetDatabase.LoadAssetAtPath<IngredientData>(path);
+            if (asset == null)
+                Debug.LogWarning($"[SampleDataGenerator] IngredientData が見つかりません: {path}");
+            return asset;
+        }
+
+        var mapping = new (string enemyFile, string normalId, string justId)[]
+        {
+            ("ENM_Cactus",      "ING_Vegetable", "ING_Herb"),    // 通常: 野菜,     ジャスト: 薬草
+            ("ENM_Boss",        "ING_Meat",      "ING_Bone"),    // 通常: 生肉,     ジャスト: 骨
+            ("ENM_DragonLord",  "ING_Meat",      "ING_Scale"),   // 通常: 生肉,     ジャスト: 鱗
+            ("ENM_PoisonHydra", "ING_Bone",      "ING_Poison"),  // 通常: 骨,       ジャスト: 毒腺
+            ("ENM_Dummy",       "ING_Vegetable", "ING_Meat"),    // 通常: 野菜,     ジャスト: 生肉
         };
 
-        foreach (var (enemyFile, normalIdx, justIdx) in mapping)
+        foreach (var (enemyFile, normalId, justId) in mapping)
         {
             string enemyPath = $"{ENEMY_DIR}/{enemyFile}.asset";
             var enemyData = AssetDatabase.LoadAssetAtPath<EnemyData>(enemyPath);
@@ -418,168 +316,16 @@ public static class SampleDataGenerator
                 continue;
             }
 
+            var normalIng = LoadIng(normalId);
+            var justIng   = LoadIng(justId);
+
             var so = new SerializedObject(enemyData);
-            so.FindProperty("_dropItemNormal").objectReferenceValue = ingredients[normalIdx];
-            so.FindProperty("_dropItemJust").objectReferenceValue = ingredients[justIdx];
+            so.FindProperty("_dropItemNormal").objectReferenceValue = normalIng;
+            so.FindProperty("_dropItemJust").objectReferenceValue   = justIng;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(enemyData);
-            Debug.Log($"[SampleDataGenerator] {enemyFile} ドロップ結線: 通常={ingredients[normalIdx].DisplayName}, ジャスト={ingredients[justIdx].DisplayName}");
+            Debug.Log($"[SampleDataGenerator] {enemyFile} ドロップ結線: 通常={normalId}, ジャスト={justId}");
         }
-    }
-
-    // ──────────────────────────────────────────────
-    // QualityScaleTable
-    // ──────────────────────────────────────────────
-
-    private static QualityScaleTable GenerateQualityScaleTable()
-    {
-        string path = $"{QUALITY_DIR}/QualityScaleTable.asset";
-        var existing = AssetDatabase.LoadAssetAtPath<QualityScaleTable>(path);
-        if (existing != null)
-        {
-            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
-            return existing;
-        }
-
-        EnsureDirectory(QUALITY_DIR);
-        var asset = ScriptableObject.CreateInstance<QualityScaleTable>();
-        // デフォルトのコンストラクタで適切な倍率が設定済み
-        AssetDatabase.CreateAsset(asset, path);
-        Debug.Log($"[SampleDataGenerator] 生成: {path}");
-        return asset;
-    }
-
-    // ──────────────────────────────────────────────
-    // DishData
-    // ──────────────────────────────────────────────
-
-    private static DishData[] GenerateDishes(QualityScaleTable qualityTable)
-    {
-        EnsureDirectory(DISH_DIR);
-
-        var definitions = new[]
-        {
-            new DishDef("DISH_Steak",       "ステーキ",           "ジューシーな肉料理。攻撃力アップ。",
-                        DishCategory.Meat,   80, 0.15f, 3, 0.05f, 150, 60, 5f),
-            new DishDef("DISH_Salad",        "サラダ",             "新鮮な野菜サラダ。防御力アップ。",
-                        DishCategory.Salad,  40, 0.10f, 3, 0.03f, 80,  40, 3f),
-            new DishDef("DISH_Stew",         "シチュー",           "温かいシチュー。攻撃力アップ。",
-                        DishCategory.Meat,   60, 0.12f, 4, 0.04f, 200, 55, 6f),
-            new DishDef("DISH_DragonSteak",  "竜王のステーキ",     "最高級の一品。攻撃力大幅アップ。",
-                        DishCategory.Meat,  120, 0.25f, 5, 0.08f, 500, 90, 8f),
-            new DishDef("DISH_PoisonStew",   "毒蛇のシチュー",     "独特の風味のシチュー。速度アップ。",
-                        DishCategory.Fish,   70, 0.18f, 4, 0.06f, 350, 70, 7f),
-            new DishDef("DISH_Pudding",      "プリン",             "甘いデザート。毎ターンHP回復。",
-                        DishCategory.Dessert, 30, 0.08f, 5, 0.02f, 120, 65, 4f),
-        };
-
-        var results = new DishData[definitions.Length];
-        for (int i = 0; i < definitions.Length; i++)
-        {
-            results[i] = CreateDish(definitions[i], qualityTable);
-        }
-        return results;
-    }
-
-    private static DishData CreateDish(DishDef def, QualityScaleTable qualityTable)
-    {
-        string path = $"{DISH_DIR}/{def.Id}.asset";
-        var existing = AssetDatabase.LoadAssetAtPath<DishData>(path);
-        if (existing != null)
-        {
-            Debug.Log($"[SampleDataGenerator] 既存スキップ: {path}");
-            return existing;
-        }
-
-        var asset = ScriptableObject.CreateInstance<DishData>();
-        var so = new SerializedObject(asset);
-        // ItemData 基底フィールド
-        so.FindProperty("_itemID").stringValue = def.Id;
-        so.FindProperty("_displayName").stringValue = def.DisplayName;
-        so.FindProperty("_description").stringValue = def.Description;
-        so.FindProperty("_sellPrice").intValue = def.ShopPrice / 2;
-        // DishData 固有フィールド
-        so.FindProperty("_category").enumValueIndex = (int)def.Category;
-        so.FindProperty("_hpRecoveryAmount").intValue = def.HpRecovery;
-        so.FindProperty("_baseBuff").floatValue = def.BaseBuff;
-        so.FindProperty("_buffDurationTurns").intValue = def.BuffDuration;
-        so.FindProperty("_scoutBonus").floatValue = def.ScoutBonus;
-        so.FindProperty("_shopPrice").intValue = def.ShopPrice;
-        so.FindProperty("_baseSatisfaction").intValue = def.Satisfaction;
-        so.FindProperty("_servingTime").floatValue = def.ServingTime;
-        so.FindProperty("_qualityTable").objectReferenceValue = qualityTable;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        AssetDatabase.CreateAsset(asset, path);
-        Debug.Log($"[SampleDataGenerator] 生成: {path}");
-        return asset;
-    }
-
-    // ──────────────────────────────────────────────
-    // RecipeData（新スキーマ）
-    // ──────────────────────────────────────────────
-
-    private static void GenerateRecipes(DishData[] dishes, IngredientData[] ingredients)
-    {
-        EnsureDirectory(RECIPE_DIR);
-
-        // ingredients: 0=Meat, 1=Vegetable, 2=Bone, 3=Scale, 4=Poison, 5=Herb
-        var meat = ingredients[0];
-        var veg  = ingredients[1];
-        var bone = ingredients[2];
-        var scale = ingredients[3];
-        var poison = ingredients[4];
-        var herb = ingredients[5];
-
-        // dishes: 0=Steak, 1=Salad, 2=Stew, 3=DragonSteak, 4=PoisonStew, 5=Pudding
-        CreateRecipe("RCP_Steak",       "ステーキ",         "肉を焼いた定番料理。",
-                     dishes[0], new IngSlot[]{ new IngSlot(meat, 2) }, 1);
-        CreateRecipe("RCP_Salad",       "サラダ",           "新鮮な野菜のサラダ。",
-                     dishes[1], new IngSlot[]{ new IngSlot(veg, 2) }, 1);
-        CreateRecipe("RCP_Stew",        "シチュー",         "肉と野菜の煮込み。",
-                     dishes[2], new IngSlot[]{ new IngSlot(meat, 1), new IngSlot(veg, 1) }, 1);
-        CreateRecipe("RCP_DragonSteak", "竜王のステーキ",   "最上級の鱗付き肉ステーキ。",
-                     dishes[3], new IngSlot[]{ new IngSlot(meat, 3), new IngSlot(scale, 1) }, 3);
-        CreateRecipe("RCP_PoisonStew",  "毒蛇のシチュー",   "毒素が旨味に変わる一品。",
-                     dishes[4], new IngSlot[]{ new IngSlot(bone, 2), new IngSlot(poison, 1) }, 2);
-        CreateRecipe("RCP_Pudding",     "プリン",           "甘くて優しいデザート。",
-                     dishes[5], new IngSlot[]{ new IngSlot(veg, 1), new IngSlot(herb, 1) }, 1);
-    }
-
-    private static void CreateRecipe(
-        string id, string displayName, string description,
-        DishData outputDish, IngSlot[] ingredients, int requiredChefLevel)
-    {
-        string path = $"{RECIPE_DIR}/{id}.asset";
-
-        // 既存の旧スキーマアセットを削除して新スキーマで再生成
-        var existing = AssetDatabase.LoadAssetAtPath<RecipeData>(path);
-        if (existing != null)
-        {
-            AssetDatabase.DeleteAsset(path);
-            Debug.Log($"[SampleDataGenerator] 旧レシピ削除: {path}");
-        }
-
-        var asset = ScriptableObject.CreateInstance<RecipeData>();
-        var so = new SerializedObject(asset);
-        so.FindProperty("_recipeID").stringValue = id;
-        so.FindProperty("_displayName").stringValue = displayName;
-        so.FindProperty("_description").stringValue = description;
-        so.FindProperty("_outputDish").objectReferenceValue = outputDish;
-        so.FindProperty("_requiredChefLevel").intValue = requiredChefLevel;
-
-        var ingProp = so.FindProperty("_ingredients");
-        ingProp.arraySize = ingredients.Length;
-        for (int i = 0; i < ingredients.Length; i++)
-        {
-            var element = ingProp.GetArrayElementAtIndex(i);
-            element.FindPropertyRelative("Ingredient").objectReferenceValue = ingredients[i].Data;
-            element.FindPropertyRelative("Amount").intValue = ingredients[i].Amount;
-        }
-
-        so.ApplyModifiedPropertiesWithoutUndo();
-        AssetDatabase.CreateAsset(asset, path);
-        Debug.Log($"[SampleDataGenerator] 生成: {path}");
     }
 
     // ──────────────────────────────────────────────
@@ -649,67 +395,5 @@ public static class SampleDataGenerator
         }
     }
 
-    private struct DishDef
-    {
-        public string Id;
-        public string DisplayName;
-        public string Description;
-        public DishCategory Category;
-        public int HpRecovery;
-        public float BaseBuff;
-        public int BuffDuration;
-        public float ScoutBonus;
-        public int ShopPrice;
-        public int Satisfaction;
-        public float ServingTime;
-
-        public DishDef(string id, string displayName, string description,
-                       DishCategory category, int hpRecovery, float baseBuff,
-                       int buffDuration, float scoutBonus, int shopPrice,
-                       int satisfaction, float servingTime)
-        {
-            Id = id;
-            DisplayName = displayName;
-            Description = description;
-            Category = category;
-            HpRecovery = hpRecovery;
-            BaseBuff = baseBuff;
-            BuffDuration = buffDuration;
-            ScoutBonus = scoutBonus;
-            ShopPrice = shopPrice;
-            Satisfaction = satisfaction;
-            ServingTime = servingTime;
-        }
-    }
-
-    private struct IngSlot
-    {
-        public IngredientData Data;
-        public int Amount;
-        public IngSlot(IngredientData data, int amount) { Data = data; Amount = amount; }
-    }
-
-    private struct IngDef
-    {
-        public string Id;
-        public string DisplayName;
-        public string Description;
-        public int Rarity;
-        public float DropRate;
-        public float GaugeSpeedMultiplier;
-        public int SellPrice;
-
-        public IngDef(string id, string displayName, string description,
-                      int rarity, float dropRate, float gaugeSpeedMultiplier, int sellPrice)
-        {
-            Id = id;
-            DisplayName = displayName;
-            Description = description;
-            Rarity = rarity;
-            DropRate = dropRate;
-            GaugeSpeedMultiplier = gaugeSpeedMultiplier;
-            SellPrice = sellPrice;
-        }
-    }
 }
 #endif

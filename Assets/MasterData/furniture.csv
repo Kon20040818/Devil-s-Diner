@@ -1,0 +1,4 @@
+Id,DisplayName,Description,Type,Price,SatisfactionBonus,CustomerBonus
+FRN_Table,テーブルセット,席を増やして来客数アップ,Table,200,0.1,1
+FRN_Decoration,装飾品,おしゃれな内装で満足度アップ,Decoration,500,0.2,0
+FRN_KitchenUpgrade,厨房改修,設備一新で大幅ボーナス,Kitchen,1000,0.3,2

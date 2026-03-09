@@ -14,7 +14,7 @@ using System.IO;
 /// </summary>
 public sealed class InventoryTestTool : EditorWindow
 {
-    private const string ASSET_DIR = "Assets/Data/TestItems";
+    private const string ASSET_DIR = "Assets/Resources/Data/TestItems";
 
     [MenuItem("DevilsDiner/Inventory Test Tool")]
     private static void ShowWindow()
